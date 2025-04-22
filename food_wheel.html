@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>要吃什麼？轉盤</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #fff8e1;
+    }
+    canvas {
+      margin-top: 20px;
+      background: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+      background-size: cover;
+      border-radius: 50%;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>🍽️ 要吃什麼？</h1>
+  <canvas id="wheel" width="500" height="500"></canvas>
+  <button onclick="spin()">轉一下！</button>
+
+  <script>
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 200;
+    const options = [
+      { label: "空腹減肥", icon: "🚫" },
+      { label: "珍奶一杯就夠", icon: "🧋" },
+      { label: "健康餐盒", icon: "🥗" },
+      { label: "雞排加辣不切", icon: "🍗" },
+      { label: "吃草沙拉", icon: "🥬" },
+      { label: "清粥小菜", icon: "🥣" },
+      { label: "大排檔小吃", icon: "🍢" },
+      { label: "異國美食", icon: "🌮" },
+      { label: "速食快餐", icon: "🍔" },
+      { label: "泡麵", icon: "🍜" },
+      { label: "家裡自煮", icon: "🏠" },
+      { label: "素食料理", icon: "🥦" },
+      { label: "超商輕食", icon: "🥪" },
+      { label: "自助餐", icon: "🍱" },
+      { label: "炭烤燒物", icon: "🍢" },
+      { label: "麵包三明治類", icon: "🥯" }
+    ];
+    let angle = 0;
+    let spinning = false;
+
+    function drawWheel() {
+      const arcSize = (2 * Math.PI) / options.length;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      options.forEach((opt, i) => {
+        const start = angle + i * arcSize;
+        const end = start + arcSize;
+
+        const isSpecial = opt.label === "空腹減肥";
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, start, end);
+        ctx.fillStyle = isSpecial ? "#000" : (i % 2 === 0 ? "#f9a825" : "#f57f17");
+        ctx.fill();
+        ctx.closePath();
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(start + arcSize / 2);
+        ctx.textAlign = "center";
+        ctx.font = "14px sans-serif";
+        ctx.fillStyle = isSpecial ? "white" : "black";
+
+        ctx.fillText(opt.icon, radius - 70, -8);
+        ctx.fillText(opt.label, radius - 70, 12);
+        ctx.restore();
+      });
+
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY - radius - 20);
+      ctx.lineTo(centerX - 10, centerY - radius - 40);
+      ctx.lineTo(centerX + 10, centerY - radius - 40);
+      ctx.fillStyle = "red";
+      ctx.fill();
+    }
+
+    function spin() {
+      if (spinning) return;
+      spinning = true;
+      const spinTime = 4000;
+      const spinAngle = Math.random() * 360 + 1440;
+
+      const start = performance.now();
+
+      function animate(time) {
+        const elapsed = time - start;
+        const t = Math.min(elapsed / spinTime, 1);
+        angle = (spinAngle * easeOut(t)) * Math.PI / 180;
+        drawWheel();
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          spinning = false;
+          const selected = options[Math.floor(options.length - ((angle % (2 * Math.PI)) / (2 * Math.PI)) * options.length) % options.length];
+          alert(`今天吃：${selected.label} ${selected.icon}`);
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function easeOut(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    drawWheel();
+  </script>
+</body>
+</html>

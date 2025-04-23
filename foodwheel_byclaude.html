@@ -1,4 +1,21 @@
-import { useState, useRef } from 'react';
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>今天吃什麼？轉盤遊戲</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <style>
+    /* 在這裡添加您的CSS樣式 */
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // 在這裡粘貼轉盤遊戲的代碼
+    import { useState, useRef } from 'react';
 
 export default function FoodSpinner() {
   const [rotation, setRotation] = useState(0);
@@ -198,3 +215,11 @@ export default function FoodSpinner() {
     </div>
   );
 }
+    function FoodSpinner() {
+      // React 組件代碼...
+    }
+    
+    ReactDOM.render(<FoodSpinner />, document.getElementById('root'));
+  </script>
+</body>
+</html>

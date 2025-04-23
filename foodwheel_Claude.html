@@ -1,0 +1,200 @@
+import { useState, useRef } from 'react';
+
+export default function FoodSpinner() {
+  const [rotation, setRotation] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const [result, setResult] = useState('');
+  
+  const options = [
+    '超商輕食',
+    '空腹減肥',
+    '珍奶一杯就夠',
+    '異國美食',
+    '雞排要切不要辣',
+    '大排檔小吃',
+    '清粥小菜',
+    '自助餐便當',
+    '速食快餐',
+    '素食料理',
+    '吃草沙拉',
+    '健康餐盒',
+    '泡麵',
+    '家裡有什麼吃什麼',
+    '炭烤燒物'
+  ];
+  
+  // 創建一個色譜效果的顏色陣列（跳過索引1，因為那是"空腹減肥"）
+  const spectrumColors = [
+    '#FF5252', // 紅色
+    '#000000', // 黑色 - 空腹減肥專用
+    '#FF9800', // 橙色
+    '#FFEB3B', // 黃色
+    '#8BC34A', // 淺綠色
+    '#4CAF50', // 綠色
+    '#009688', // 青綠色
+    '#00BCD4', // 青色
+    '#03A9F4', // 淺藍色
+    '#2196F3', // 藍色
+    '#3F51B5', // 靛藍色
+    '#673AB7', // 深紫色
+    '#9C27B0', // 紫色
+    '#E91E63', // 粉紅色
+    '#FF4081'  // 桃紅色
+  ];
+  
+  const segmentAngle = 360 / options.length;
+  
+  const spin = () => {
+    if (spinning) return;
+    
+    setSpinning(true);
+    setResult('');
+    
+    // 隨機旋轉角度 (720度到2160度之間，確保至少轉2-6圈)
+    const spinAngle = 720 + Math.random() * 1440;
+    const newRotation = rotation + spinAngle;
+    
+    setRotation(newRotation);
+    
+    // 計算結果
+    setTimeout(() => {
+      calculateResult(newRotation);
+      setSpinning(false);
+    }, 3000);
+  };
+  
+  const calculateResult = (finalRotation) => {
+    // 轉盤停止後，計算指針所指的選項
+    // 指針現在在90度位置，所以需要調整計算
+    const normalizedRotation = finalRotation % 360;
+    const pointerAngle = (450 - normalizedRotation) % 360; // 加上90度的偏移
+    
+    // 計算指向哪個選項
+    const selectedIndex = Math.floor(pointerAngle / segmentAngle);
+    setResult(options[selectedIndex % options.length]);
+  };
+
+  // 生成SVG扇形路徑
+  const createSlicePath = (index) => {
+    const startAngle = index * segmentAngle;
+    const endAngle = (index + 1) * segmentAngle;
+    
+    const startRad = (startAngle - 90) * Math.PI / 180;
+    const endRad = (endAngle - 90) * Math.PI / 180;
+    
+    const x1 = 160 + 160 * Math.cos(startRad);
+    const y1 = 160 + 160 * Math.sin(startRad);
+    const x2 = 160 + 160 * Math.cos(endRad);
+    const y2 = 160 + 160 * Math.sin(endRad);
+    
+    const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+    
+    return `M 160,160 L ${x1},${y1} A 160,160 0 ${largeArcFlag},1 ${x2},${y2} Z`;
+  };
+  
+  return (
+    <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">今天吃什麼？</h2>
+      
+      <div className="relative w-80 h-80 mb-6">
+        {/* 木質外框 */}
+        <div 
+          className="absolute w-full h-full rounded-full"
+          style={{
+            background: 'radial-gradient(circle, #DAA06D 0%, #8B4513 100%)',
+            backgroundSize: '100% 100%',
+            boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.5)',
+            zIndex: 0,
+            transform: 'scale(1.1)'
+          }}
+        />
+        
+        {/* 轉盤 - 使用SVG */}
+        <div 
+          className="absolute w-full h-full"
+          style={{
+            transform: `rotate(${rotation}deg)`,
+            transition: spinning ? 'transform 3s cubic-bezier(0.1, 0.25, 0.1, 1)' : 'none',
+            zIndex: 1
+          }}
+        >
+          <svg width="320" height="320" viewBox="0 0 320 320">
+            {options.map((option, index) => {
+              // 決定顏色 - 空腹減肥為黑底白字
+              const isSpecial = option === '空腹減肥';
+              const bgColor = spectrumColors[index];
+              const textColor = isSpecial ? '#FFFFFF' : '#000000';
+              
+              // 計算文字路徑的圓弧
+              const textPathRadius = 130; // 文字圓弧半徑
+              const midAngle = (index * segmentAngle + segmentAngle / 2 - 90) * Math.PI / 180;
+              const textX = 160 + textPathRadius * Math.cos(midAngle);
+              const textY = 160 + textPathRadius * Math.sin(midAngle);
+              const textRotation = index * segmentAngle + segmentAngle / 2;
+              
+              return (
+                <g key={index}>
+                  {/* 扇形區域 */}
+                  <path 
+                    d={createSlicePath(index)} 
+                    fill={bgColor} 
+                    stroke="#FFFFFF" 
+                    strokeWidth="1"
+                  />
+                  
+                  {/* 直向文字 */}
+                  <text 
+                    x={textX}
+                    y={textY}
+                    fill={textColor}
+                    fontSize="12"
+                    fontWeight="500"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    transform={`rotate(${textRotation}, ${textX}, ${textY})`}
+                  >
+                    {option.split('').map((char, i) => (
+                      <tspan key={i} x={textX} dy={i === 0 ? 0 : '1em'}>
+                        {char}
+                      </tspan>
+                    ))}
+                  </text>
+                </g>
+              );
+            })}
+            
+            {/* 中心圓 */}
+            <circle cx="160" cy="160" r="32" fill="white" stroke="#666666" strokeWidth="4" />
+          </svg>
+        </div>
+        
+        {/* 指針 - 在右側90度位置 */}
+        <div 
+          className="absolute w-8 h-16 bg-red-600 top-1/2 right-0 transform translate-x-1/2 -translate-y-1/2 z-30" 
+          style={{ 
+            clipPath: 'polygon(0% 50%, 100% 0%, 100% 100%)',
+            filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.5))'
+          }}
+        ></div>
+      </div>
+      
+      <button 
+        onClick={spin}
+        disabled={spinning}
+        className={`px-6 py-3 rounded-full font-bold text-white shadow-lg transform transition-transform ${spinning ? 'bg-gray-500' : 'bg-blue-600 hover:bg-blue-700 hover:scale-105'}`}
+      >
+        {spinning ? '轉動中...' : '開始轉動'}
+      </button>
+      
+      {result && (
+        <div className="mt-6 p-4 bg-white rounded-lg shadow-md text-center" style={{
+          background: 'linear-gradient(45deg, #8B4513 0%, #A0522D 25%, #CD853F 50%, #A0522D 75%, #8B4513 100%)',
+          color: 'white'
+        }}>
+          <p className="text-white text-opacity-90">今天的選擇是：</p>
+          <p className="text-xl font-bold text-white">{result}</p>
+        </div>
+      )}
+    </div>
+  );
+}

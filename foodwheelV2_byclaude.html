@@ -51,13 +51,15 @@
         
         .plate-cup-container {
             position: relative;
-            width: 400px;
+            width: 600px;
             height: 400px;
             margin-bottom: 30px;
         }
         
         .plate {
             position: absolute;
+            left: 50px;
+            top: 50px;
             width: 300px;
             height: 300px;
             background-color: #f0f0f0;
@@ -169,7 +171,7 @@
         .cup {
             position: absolute;
             top: 50px;
-            left: 200px;
+            right: 50px;
             width: 150px;
             height: 180px;
             background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(173,216,230,0.3) 50%, rgba(173,216,230,0.5) 100%);
@@ -432,12 +434,20 @@
         // 目前選擇的類型（食物或飲料或兩者）
         let currentType = 'food';
         
+        // 初始化顯示/隱藏盤子和杯子
+        document.getElementById('cup').style.display = 'none';
+        document.getElementById('plate').style.display = 'flex';
+        
         // 切換食物/飲料按鈕
         document.getElementById('food-btn').addEventListener('click', function() {
             currentType = 'food';
             this.classList.add('active');
             document.getElementById('drink-btn').classList.remove('active');
             document.getElementById('both-btn').classList.remove('active');
+            
+            // 顯示盤子，隱藏杯子
+            document.getElementById('plate').style.display = 'flex';
+            document.getElementById('cup').style.display = 'none';
         });
         
         document.getElementById('drink-btn').addEventListener('click', function() {
@@ -445,6 +455,10 @@
             this.classList.add('active');
             document.getElementById('food-btn').classList.remove('active');
             document.getElementById('both-btn').classList.remove('active');
+            
+            // 隱藏盤子，顯示杯子
+            document.getElementById('plate').style.display = 'none';
+            document.getElementById('cup').style.display = 'flex';
         });
         
         document.getElementById('both-btn').addEventListener('click', function() {
@@ -452,28 +466,11 @@
             this.classList.add('active');
             document.getElementById('food-btn').classList.remove('active');
             document.getElementById('drink-btn').classList.remove('active');
-        });
-        
-        // 新增輸入欄位函數
-        function addInputField(type, maxCount = 5) {
-            const container = document.getElementById(`${type}-inputs`);
-            const inputs = container.querySelectorAll(`.${type}-input`);
             
-            if (inputs.length < maxCount) {
-                const inputField = document.createElement('div');
-                inputField.className = 'input-field';
-                inputField.innerHTML = `<input type="text" placeholder="請輸入${type === 'restaurant' ? '店名' : type === 'dish' ? '餐點選項' : '飲料選項'}" class="${type}-input">`;
-                container.appendChild(inputField);
-            } else {
-                alert(`最多只能添加 ${maxCount} 個選項！`);
-            }
-        }
-        
-        // 註冊新增按鈕事件
-        document.getElementById('add-restaurant').addEventListener('click', () => addInputField('restaurant'));
-        document.getElementById('add-dish').addEventListener('click', () => addInputField('dish'));
-        document.getElementById('add-drink-store').addEventListener('click', () => addInputField('drink-store'));
-        document.getElementById('add-drink').addEventListener('click', () => addInputField('drink'));
+            // 顯示盤子和杯子
+            document.getElementById('plate').style.display = 'flex';
+            document.getElementById('cup').style.display = 'flex';
+        });
         
         // 開始按鈕
         document.getElementById('start-btn').addEventListener('click', function() {
@@ -524,14 +521,7 @@
             // 禁用開始按鈕
             this.disabled = true;
             
-            // 根據當前類型選擇容器和選項
-            const spinner = currentType === 'food' ? 
-                document.getElementById('food-spinner') : 
-                document.getElementById('drink-spinner');
-                
-            const options = currentType === 'food' ? foodOptions : drinkOptions;
-            
-            // 開始輪盤動畫
+            // 開始輪盤動畫函數
             function startSpinner(type, options, elementId, resultElementId, callback = null) {
                 const spinner = document.getElementById(elementId);
                 const resultDisplay = document.getElementById(resultElementId);
@@ -566,7 +556,7 @@
                             spinner.className = 'spinner-text final';
                             
                             // 更新結果顯示
-                            if (resultElementId) {
+                            if (resultElementId && type) {
                                 resultDisplay.textContent = `${type}: ${result}`;
                             }
                             
@@ -578,15 +568,8 @@
                 animate();
             }
             
-            // 禁用開始按鈕
-            this.disabled = true;
-            
-            // 根據當前類型選擇容器和選項
+            // 根據當前類型啟動不同的轉輪
             if (currentType === 'food') {
-                // 顯示對應容器
-                document.getElementById('plate').style.display = 'flex';
-                document.getElementById('cup').style.display = 'none';
-                
                 // 開始食物輪盤
                 startSpinner('食物', foodOptions, 'food-spinner', 'result-display', () => {
                     // 啟用開始按鈕
@@ -594,10 +577,6 @@
                 });
             } 
             else if (currentType === 'drink') {
-                // 顯示對應容器
-                document.getElementById('plate').style.display = 'none';
-                document.getElementById('cup').style.display = 'flex';
-                
                 // 開始飲料輪盤
                 startSpinner('飲料', drinkOptions, 'drink-spinner', 'result-display', () => {
                     // 啟用開始按鈕
@@ -605,10 +584,6 @@
                 });
             }
             else if (currentType === 'both') {
-                // 同時顯示兩個容器
-                document.getElementById('plate').style.display = 'flex';
-                document.getElementById('cup').style.display = 'flex';
-                
                 // 清空結果顯示區
                 document.getElementById('result-display').textContent = '';
                 
@@ -629,6 +604,7 @@
                         });
                     }, 500);
                 });
+            }
         });
         
         // 重置按鈕

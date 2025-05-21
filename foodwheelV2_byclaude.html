@@ -94,7 +94,7 @@
         .fork {
             position: absolute;
             top: 50%;
-            left: -60px;
+            left: -40px;
             width: 25px;
             height: 120px;
             background-color: #c0c0c0;
@@ -149,7 +149,7 @@
         .knife {
             position: absolute;
             top: 50%;
-            right: -60px;
+            right: -40px;
             width: 25px;
             height: 130px;
             background-color: #c0c0c0;
@@ -195,7 +195,7 @@
         .cup {
             position: absolute;
             top: 50px;
-            right: 50px;
+            right: 50px; /* 移到右邊 */
             width: 150px;
             height: 180px;
             background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(173,216,230,0.3) 50%, rgba(173,216,230,0.5) 100%);
@@ -485,8 +485,21 @@
         document.getElementById('usage-count').textContent = usageCount;
         
         // 預設值設定
-        const defaultFoodOptions = ["空腹不吃", "便當", "速食", "麵食", "飯糰"];
-        const defaultDrinkOptions = ["白開水", "咖啡", "茶", "果汁", "汽水"];
+        const defaultFoodOptions = [
+            { main: "空腹不吃", detail: "預設餐點" },
+            { main: "便當", detail: "預設餐點" },
+            { main: "速食", detail: "預設餐點" },
+            { main: "麵食", detail: "預設餐點" },
+            { main: "飯糰", detail: "預設餐點" }
+        ];
+        
+        const defaultDrinkOptions = [
+            { main: "白開水", detail: "預設飲料" },
+            { main: "咖啡", detail: "預設飲料" },
+            { main: "茶", detail: "預設飲料" },
+            { main: "果汁", detail: "預設飲料" },
+            { main: "汽水", detail: "預設飲料" }
+        ];
         
         // 目前選擇的類型（食物或飲料或兩者）
         let currentType = 'food';
@@ -564,7 +577,7 @@
                 .slice(0, 5);
             
             // 結構化食物選項（包含店名和餐點）
-            const foodOptions = [];
+            let foodOptions = [];
             // 如果有輸入店名
             if (restaurantInputs.length > 0) {
                 restaurantInputs.forEach(store => {
@@ -587,16 +600,11 @@
             
             // 如果沒有任何食物選項，則使用預設選項
             if (foodOptions.length === 0) {
-                defaultFoodOptions.forEach(food => {
-                    foodOptions.push({
-                        main: food,
-                        detail: '預設餐點'
-                    });
-                });
+                foodOptions = [...defaultFoodOptions]; // 確保使用預設值
             }
             
             // 結構化飲料選項（包含店名和飲料）
-            const drinkOptions = [];
+            let drinkOptions = [];
             // 如果有輸入飲料店
             if (drinkStoreInputs.length > 0) {
                 drinkStoreInputs.forEach(store => {
@@ -619,12 +627,7 @@
             
             // 如果沒有任何飲料選項，則使用預設選項
             if (drinkOptions.length === 0) {
-                defaultDrinkOptions.forEach(drink => {
-                    drinkOptions.push({
-                        main: drink,
-                        detail: '預設飲料'
-                    });
-                });
+                drinkOptions = [...defaultDrinkOptions]; // 確保使用預設值
             }
             
             // 禁用開始按鈕
@@ -711,82 +714,6 @@
                     setTimeout(() => {
                         startSpinner('飲料', drinkOptions, 'drink-spinner', null, (drinkResult) => {
                             document.getElementById('result-display').textContent = `食物: ${foodResult.main} (${foodResult.detail}) | 飲料: ${drinkResult.main} (${drinkResult.detail})`;
-                            // 啟用開始按鈕
-                            document.getElementById('start-btn').disabled = false;
-                        });
-                    }, 500);
-                });
-            }
-        });
-        
-        // 重置按鈕
-        document.getElementById('reset-btn').addEventListener('click', function() {
-            // 清空所有輸入
-            document.getElementById('restaurant-batch').value = '';
-            document.getElementById('dish-batch').value = '';
-            document.getElementById('drink-store-batch').value = '';
-            document.getElementById('drink-batch').value = '';
-            
-            // 重置結果顯示
-            document.getElementById('result-display').textContent = '請輸入選項並點擊開始';
-            document.getElementById('food-spinner').textContent = '';
-            document.getElementById('drink-spinner').textContent = '';
-        });
-    </script>.className = 'spinner-text';
-                        
-                        if (elapsed < animationDuration && count < maxCount) {
-                            setTimeout(animate, speed);
-                        } else {
-                            // 動畫結束，顯示最終結果
-                            const finalIndex = Math.floor(Math.random() * options.length);
-                            const result = options[finalIndex];
-                            spinner.textContent = result;
-                            spinner.className = 'spinner-text final';
-                            
-                            // 更新結果顯示
-                            if (resultElementId && type) {
-                                resultDisplay.textContent = `${type}: ${result}`;
-                            }
-                            
-                            if (callback) callback(result);
-                        }
-                    }, 150);
-                }
-                
-                animate();
-            }
-            
-            // 根據當前類型啟動不同的轉輪
-            if (currentType === 'food') {
-                // 開始食物輪盤
-                startSpinner('食物', foodOptions, 'food-spinner', 'result-display', () => {
-                    // 啟用開始按鈕
-                    document.getElementById('start-btn').disabled = false;
-                });
-            } 
-            else if (currentType === 'drink') {
-                // 開始飲料輪盤
-                startSpinner('飲料', drinkOptions, 'drink-spinner', 'result-display', () => {
-                    // 啟用開始按鈕
-                    document.getElementById('start-btn').disabled = false;
-                });
-            }
-            else if (currentType === 'both') {
-                // 清空結果顯示區
-                document.getElementById('result-display').textContent = '';
-                
-                // 食物結果暫存
-                let foodResult = null;
-                
-                // 開始食物輪盤，然後開始飲料輪盤
-                startSpinner('食物', foodOptions, 'food-spinner', null, (result) => {
-                    foodResult = result;
-                    document.getElementById('result-display').textContent = `食物: ${result}`;
-                    
-                    // 飲料輪盤稍延遲再開始
-                    setTimeout(() => {
-                        startSpinner('飲料', drinkOptions, 'drink-spinner', null, (drinkResult) => {
-                            document.getElementById('result-display').textContent = `食物: ${foodResult} | 飲料: ${drinkResult}`;
                             // 啟用開始按鈕
                             document.getElementById('start-btn').disabled = false;
                         });

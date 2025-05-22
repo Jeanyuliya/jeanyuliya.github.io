@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>今天吃什麼?</title>
+    <subtitle>除了預設也可自行輸入</subtitle>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -486,7 +487,7 @@
         
         // 預設值設定
         const defaultFoodOptions = [
-            { main: "餓肚子不吃", detail: "預設隱藏選項" }
+            { main: "餓肚不吃", detail: "預設隱藏選項" }
         ];
         
         const defaultDrinkOptions = [
@@ -607,8 +608,8 @@
                 foodOptions.push(
                     { main: "便當", detail: "預設餐點" }, 
                     { main: "速食", detail: "預設餐點" }, 
-                    { main: "麵食", detail: "預設餐點" }, 
-                    { main: "飯糰", detail: "預設餐點" }
+                    { main: "超商", detail: "預設餐點" }, 
+                    { main: "大排檔", detail: "預設餐點" }
                 );
             }
             
@@ -649,7 +650,7 @@
             else {
                 drinkOptions.push(
                     { main: "咖啡", detail: "預設飲料" }, 
-                    { main: "茶", detail: "預設飲料" }, 
+                    { main: "奶茶", detail: "預設飲料" }, 
                     { main: "果汁", detail: "預設飲料" }, 
                     { main: "汽水", detail: "預設飲料" }
                 );

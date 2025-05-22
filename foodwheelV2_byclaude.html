@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>今天吃什麼?</title>
-    <subtitle>除了預設也可自行輸入</subtitle>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -236,7 +235,7 @@
             left: 50%;
             width: 8px;
             height: 200px;
-            background-color: #ff6b6b;
+            background-color: #00bfff;
             transform: translateX(-50%) rotate(-15deg);
             z-index: 4;
             border-radius: 4px;
@@ -249,7 +248,7 @@
             left: 0;
             width: 8px;
             height: 30px;
-            background: linear-gradient(to bottom, transparent, #ff6b6b);
+            background: linear-gradient(to bottom, transparent, #00bfff);
             border-radius: 4px 4px 0 0;
         }
         
@@ -338,9 +337,14 @@
         .spinner-detail {
             font-size: 16px;
             font-weight: normal;
-            color: #666;
+            color: #1e3a8a;
             display: block;
             margin-top: 10px;
+        }
+        
+        .store-name {
+            color: #dc2626;
+            font-weight: bold;
         }
         
         .fading {
@@ -487,7 +491,7 @@
         
         // 預設值設定
         const defaultFoodOptions = [
-            { main: "餓肚不吃", detail: "預設隱藏選項" }
+            { main: "空腹不吃", detail: "預設隱藏選項" }
         ];
         
         const defaultDrinkOptions = [
@@ -681,7 +685,7 @@
                     const option = options[randomIndex];
                     
                     // 更新轉輪文字，包含主要內容和詳情
-                    spinner.innerHTML = `${option.main}<span class="spinner-detail">${option.detail}</span>`;
+                    spinner.innerHTML = `<span class="store-name">${option.main}</span><span class="spinner-detail">${option.detail}</span>`;
                     spinner.className = 'spinner-text fading';
                     
                     setTimeout(() => {
@@ -693,7 +697,7 @@
                             // 動畫結束，顯示最終結果
                             const finalIndex = Math.floor(Math.random() * options.length);
                             const result = options[finalIndex];
-                            spinner.innerHTML = `${result.main}<span class="spinner-detail">${result.detail}</span>`;
+                            spinner.innerHTML = `<span class="store-name">${result.main}</span><span class="spinner-detail">${result.detail}</span>`;
                             spinner.className = 'spinner-text final';
                             
                             // 更新結果顯示

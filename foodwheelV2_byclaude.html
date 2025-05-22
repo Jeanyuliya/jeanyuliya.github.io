@@ -58,7 +58,7 @@
         
         .plate {
             position: absolute;
-            right: 150px; /* Changed from left to right */
+            right: 150px;
             top: 50px;
             width: 300px;
             height: 300px;
@@ -94,30 +94,30 @@
         .fork {
             position: absolute;
             top: 170px;
-            right: 30px; /* Changed from left to right */
+            right: 30px;
             width: 120px;
             height: 25px;
             background-color: #c0c0c0;
             border-radius: 5px;
-            transform: rotate(-10deg); /* Changed to mirror position */
+            transform: rotate(-10deg);
         }
         
         .fork::after {
             content: '';
             position: absolute;
-            left: 0; /* Changed from right to left */
+            left: 0;
             top: 0;
             height: 25px;
             width: 70px;
             background-color: #c0c0c0;
-            background: linear-gradient(to left, #d8d8d8, #a0a0a0); /* Changed direction */
+            background: linear-gradient(to left, #d8d8d8, #a0a0a0);
             border-radius: 5px;
         }
         
         .fork::before {
             content: '';
             position: absolute;
-            left: 0; /* Changed from right to left */
+            left: 0;
             top: 0;
             height: 25px;
             width: 50px;
@@ -127,7 +127,7 @@
         
         .fork-prong {
             position: absolute;
-            left: 0; /* Changed from right to left */
+            left: 0;
             height: 4px;
             width: 40px;
             background-color: #a0a0a0;
@@ -149,41 +149,41 @@
         .knife {
             position: absolute;
             top: 120px;
-            right: 30px; /* Changed from left to right */
+            right: 30px;
             width: 130px;
             height: 25px;
             background-color: #c0c0c0;
-            border-radius: 15px 5px 5px 5px; /* Changed to mirror position */
-            transform: rotate(10deg); /* Changed to mirror position */
+            border-radius: 15px 5px 5px 5px;
+            transform: rotate(10deg);
         }
         
         .knife::after {
             content: '';
             position: absolute;
-            left: 0; /* Changed from right to left */
+            left: 0;
             top: 0;
             height: 25px;
             width: 80px;
-            background: linear-gradient(to left, #d8d8d8, #a0a0a0); /* Changed direction */
-            border-radius: 15px 5px 5px 5px; /* Changed to mirror position */
+            background: linear-gradient(to left, #d8d8d8, #a0a0a0);
+            border-radius: 15px 5px 5px 5px;
         }
         
         .spoon {
             position: absolute;
             bottom: 80px;
-            right: 50px; /* Changed from left to right */
+            right: 50px;
             width: 100px;
             height: 20px;
             background-color: #c0c0c0;
             border-radius: 10px;
-            transform: rotate(15deg); /* Changed to mirror position */
+            transform: rotate(15deg);
             z-index: 3;
         }
         
         .spoon::before {
             content: '';
             position: absolute;
-            left: -5px; /* Changed from right to left */
+            left: -5px;
             top: -5px;
             width: 30px;
             height: 30px;
@@ -195,7 +195,7 @@
         .cup {
             position: absolute;
             top: 50px;
-            left: 150px; /* Changed from right to left */
+            left: 150px;
             width: 150px;
             height: 180px;
             background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(173,216,230,0.3) 50%, rgba(173,216,230,0.5) 100%);
@@ -211,12 +211,12 @@
             content: '';
             position: absolute;
             top: 10px;
-            left: -30px; /* Changed from right to left */
+            left: -30px;
             width: 40px;
             height: 80px;
             border: 3px solid #ccc;
-            border-right: none; /* Changed from border-left to border-right */
-            border-radius: 50px 0 0 50px; /* Changed to mirror position */
+            border-right: none;
+            border-radius: 50px 0 0 50px;
         }
         
         .liquid {
@@ -236,7 +236,7 @@
             width: 8px;
             height: 200px;
             background-color: #ff6b6b;
-            transform: translateX(-50%) rotate(-15deg); /* Changed to mirror position */
+            transform: translateX(-50%) rotate(-15deg);
             z-index: 4;
             border-radius: 4px;
         }
@@ -569,18 +569,19 @@
                 .filter(line => line !== '')
                 .slice(0, 5);
             
-            // 結構化食物選項（包含店名和餐點）
-            let foodOptions = [...defaultFoodOptions]; // 首先加入隱藏的預設選項
+            // 結構化食物選項（改為順序對應）
+            let foodOptions = [...defaultFoodOptions];
             
-            // 匹配店家和餐點，若有多個餐點和店家，則每個店家搭配每個餐點
+            // 店家和餐點按順序對應
             if (restaurantInputs.length > 0 && dishInputs.length > 0) {
-                for (let i = 0; i < restaurantInputs.length; i++) {
-                    for (let j = 0; j < dishInputs.length; j++) {
-                        foodOptions.push({
-                            main: restaurantInputs[i],
-                            detail: dishInputs[j]
-                        });
-                    }
+                const maxLength = Math.max(restaurantInputs.length, dishInputs.length);
+                for (let i = 0; i < maxLength; i++) {
+                    const restaurant = restaurantInputs[i % restaurantInputs.length];
+                    const dish = dishInputs[i % dishInputs.length];
+                    foodOptions.push({
+                        main: restaurant,
+                        detail: dish
+                    });
                 }
             }
             // 只有店家
@@ -601,7 +602,7 @@
                     });
                 });
             }
-            // 如果沒有任何用戶輸入，則加入一些預設選項（但已經有一個隱藏選項了）
+            // 如果沒有任何用戶輸入，則加入一些預設選項
             else {
                 foodOptions.push(
                     { main: "便當", detail: "預設餐點" }, 
@@ -611,18 +612,19 @@
                 );
             }
             
-            // 結構化飲料選項（包含店名和飲料）
-            let drinkOptions = [...defaultDrinkOptions]; // 首先加入隱藏的預設選項
+            // 結構化飲料選項（改為順序對應）
+            let drinkOptions = [...defaultDrinkOptions];
             
-            // 匹配飲料店和飲料，若有多個飲料和店家，則每個店家搭配每個飲料
+            // 飲料店和飲料按順序對應
             if (drinkStoreInputs.length > 0 && drinkInputs.length > 0) {
-                for (let i = 0; i < drinkStoreInputs.length; i++) {
-                    for (let j = 0; j < drinkInputs.length; j++) {
-                        drinkOptions.push({
-                            main: drinkStoreInputs[i],
-                            detail: drinkInputs[j]
-                        });
-                    }
+                const maxLength = Math.max(drinkStoreInputs.length, drinkInputs.length);
+                for (let i = 0; i < maxLength; i++) {
+                    const drinkStore = drinkStoreInputs[i % drinkStoreInputs.length];
+                    const drink = drinkInputs[i % drinkInputs.length];
+                    drinkOptions.push({
+                        main: drinkStore,
+                        detail: drink
+                    });
                 }
             }
             // 只有飲料店
@@ -643,7 +645,7 @@
                     });
                 });
             }
-            // 如果沒有任何用戶輸入，則加入一些預設選項（但已經有一個隱藏選項了）
+            // 如果沒有任何用戶輸入，則加入一些預設選項
             else {
                 drinkOptions.push(
                     { main: "咖啡", detail: "預設飲料" }, 

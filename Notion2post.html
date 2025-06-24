@@ -38,13 +38,12 @@
   <div>
     <button onclick="cleanText()">格式轉換</button>
     <button onclick="copyOutput()">複製結果</button>
-    <button onclick="clearAll()">清空全部</button>
+    <button onclick="clearAll()">一鍵清空</button>
   </div>
   <div class="output-label">🔍 轉換後內容：</div>
   <textarea id="output" readonly></textarea>
   <div class="note">
-    註：自動去除 Markdown、壓縮空行（保留標題前空行）、句號後自動換行。<br />
-</code>
+    註：自動去除 Markdown、壓縮空行（保留標題前空行）、句號後自動換行。
   </div>
 
   <script>
@@ -58,18 +57,18 @@
         let line = lines[i];
         let nextLine = lines[i + 1] || '';
 
-        // 是否為標題行
-        const isHeader = /^#+\s+/.test(line);
-        const isNextHeader = /^#+\s+/.test(nextLine);
-        const isPrevHeader = i > 0 && /^#+\s+/.test(lines[i - 1]);
+        // 是否為標題行（保留 emoji）
+        const isHeaderLine = /^#+\s+/.test(line);
+        line = line.replace(/^#+\s+/, ''); // 僅移除 markdown 標題符號，不移除 emoji
 
         // 清除 markdown 標記
-        line = line.replace(/^#+\s+/, '')
-                   .replace(/^\s*-\s+/, '• ')
+        line = line.replace(/^\s*-\s+/, '• ')
                    .replace(/\*\*(.*?)\*\*/g, '$1')
                    .replace(/\*(.*?)\*/g, '$1');
 
         const isCurrentEmpty = line.trim() === '';
+        const isNextHeader = /^#+\s+/.test(nextLine);
+        const isPrevHeader = i > 0 && /^#+\s+/.test(lines[i - 1]);
 
         if (isCurrentEmpty) {
           // 保留標題前後空行
@@ -89,15 +88,15 @@
         previousWasEmpty = false;
       }
 
-      // 移除「標題行之後的多餘空行」（只限非必要）
+      // 移除「標題行之後的多餘空行」
       let cleaned = [];
       for (let i = 0; i < outputLines.length; i++) {
         const current = outputLines[i];
         const next = outputLines[i + 1] || '';
-        const isHeader = /^[^\S\r\n]*[\w\p{Emoji}]/u.test(current) && /^[^\S\r\n]*[\p{Emoji}\w]/u.test(current);
+        const isLikelyHeader = /^[\p{Emoji}\p{L}\p{N}\p{P}]+/u.test(current) && !current.includes(' ');
         const isNextEmpty = next.trim() === '';
-        if (isHeader && isNextEmpty) {
-          continue; // 移除標題後多餘空行
+        if (isLikelyHeader && isNextEmpty) {
+          continue; // 移除標題後空行
         }
         cleaned.push(current);
       }

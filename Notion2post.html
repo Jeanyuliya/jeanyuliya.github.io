@@ -59,25 +59,22 @@
 
         // 是否為標題行（保留 emoji）
         const isHeaderLine = /^#+\s+/.test(line);
-        line = line.replace(/^#+\s+/, ''); // 僅移除 markdown 標題符號，不移除 emoji
+        const isNextHeader = /^#+\s+/.test(nextLine);
+        const isPrevHeader = i > 0 && /^#+\s+/.test(lines[i - 1]);
 
-        // 清除 markdown 標記
+        // 處理 markdown 格式
+        if (isHeaderLine) {
+          line = line.replace(/^#+\s+/, '');
+        }
         line = line.replace(/^\s*-\s+/, '• ')
                    .replace(/\*\*(.*?)\*\*/g, '$1')
                    .replace(/\*(.*?)\*/g, '$1');
 
         const isCurrentEmpty = line.trim() === '';
-        const isNextHeader = /^#+\s+/.test(nextLine);
-        const isPrevHeader = i > 0 && /^#+\s+/.test(lines[i - 1]);
 
         if (isCurrentEmpty) {
-          // 保留標題前後空行
-          if (isNextHeader || isPrevHeader) {
-            outputLines.push('');
-            previousWasEmpty = true;
-            continue;
-          }
-          if (!previousWasEmpty) {
+          // 只保留標題前的空行
+          if (isNextHeader && !previousWasEmpty) {
             outputLines.push('');
             previousWasEmpty = true;
           }
@@ -88,20 +85,7 @@
         previousWasEmpty = false;
       }
 
-      // 移除「標題行之後的多餘空行」
-      let cleaned = [];
-      for (let i = 0; i < outputLines.length; i++) {
-        const current = outputLines[i];
-        const next = outputLines[i + 1] || '';
-        const isLikelyHeader = /^[\p{Emoji}\p{L}\p{N}\p{P}]+/u.test(current) && !current.includes(' ');
-        const isNextEmpty = next.trim() === '';
-        if (isLikelyHeader && isNextEmpty) {
-          continue; // 移除標題後空行
-        }
-        cleaned.push(current);
-      }
-
-      let output = cleaned.join('\n')
+      let output = outputLines.join('\n')
         .replace(/([。！？!?])([^\n])/g, '$1\n$2')
         .trim();
 

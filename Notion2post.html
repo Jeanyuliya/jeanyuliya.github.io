@@ -33,19 +33,18 @@
   </style>
 </head>
 <body>
-  <h1>🧹 MD格式轉貼文清理工具</h1>
+  <h1>🧹 貼文格式清理工具</h1>
   <textarea id="input" placeholder="貼上從 Notion 複製的內容..."></textarea>
   <div>
-    <button onclick="cleanText()">清理格式</button>
+    <button onclick="cleanText()">格式轉換</button>
     <button onclick="copyOutput()">複製結果</button>
     <button onclick="clearAll()">清空全部</button>
   </div>
-  <div class="output-label">🔍 清理後內容：</div>
+  <div class="output-label">🔍 轉換後內容：</div>
   <textarea id="output" readonly></textarea>
   <div class="note">
     註：自動去除 Markdown、壓縮空行（保留標題前空行）、句號後自動換行。<br />
-    Bookmarklet 快捷鍵（請加入書籤）：<br />
-    <code>javascript:(function(){window.open('https://你的帳號.github.io/Notion2post.html','_blank','width=600,height=500');})();</code>
+</code>
   </div>
 
   <script>
@@ -59,22 +58,23 @@
         let line = lines[i];
         let nextLine = lines[i + 1] || '';
 
-        // 標題處理
-        line = line.replace(/^#+\s+(.*)/, '$1');
-
-        // 清除 markdown
-        line = line.replace(/^\s*-\s+/, '• ')
-                   .replace(/\*\*(.*?)\*\*/g, '$1')
-                   .replace(/\*(.*?)\*/g, '$1');
-
-        // 空白行判斷（排除前後為標題的空行）
-        const isCurrentEmpty = line.trim() === '';
+        // 是否為標題行
+        const isHeader = /^#+\s+/.test(line);
         const isNextHeader = /^#+\s+/.test(nextLine);
         const isPrevHeader = i > 0 && /^#+\s+/.test(lines[i - 1]);
 
+        // 清除 markdown 標記
+        line = line.replace(/^#+\s+/, '')
+                   .replace(/^\s*-\s+/, '• ')
+                   .replace(/\*\*(.*?)\*\*/g, '$1')
+                   .replace(/\*(.*?)\*/g, '$1');
+
+        const isCurrentEmpty = line.trim() === '';
+
         if (isCurrentEmpty) {
+          // 保留標題前後空行
           if (isNextHeader || isPrevHeader) {
-            outputLines.push(''); // 保留空行在標題前後
+            outputLines.push('');
             previousWasEmpty = true;
             continue;
           }
@@ -89,8 +89,21 @@
         previousWasEmpty = false;
       }
 
-      let output = outputLines.join('\n')
-        .replace(/([。！？!?])([^\n])/g, '$1\n$2')  // 句號後換行
+      // 移除「標題行之後的多餘空行」（只限非必要）
+      let cleaned = [];
+      for (let i = 0; i < outputLines.length; i++) {
+        const current = outputLines[i];
+        const next = outputLines[i + 1] || '';
+        const isHeader = /^[^\S\r\n]*[\w\p{Emoji}]/u.test(current) && /^[^\S\r\n]*[\p{Emoji}\w]/u.test(current);
+        const isNextEmpty = next.trim() === '';
+        if (isHeader && isNextEmpty) {
+          continue; // 移除標題後多餘空行
+        }
+        cleaned.push(current);
+      }
+
+      let output = cleaned.join('\n')
+        .replace(/([。！？!?])([^\n])/g, '$1\n$2')
         .trim();
 
       document.getElementById('output').value = output;

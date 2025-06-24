@@ -33,9 +33,10 @@
   </style>
 </head>
 <body>
-  <h1>🧹 貼文格式清理工具</h1>
-  <textarea id="input" placeholder="貼上從 Notion 複製的內容..."></textarea>
+  <h1>🧹 貼文格式轉換工具</h1>
+  <textarea id="input" placeholder="請按 Ctrl+V 貼上內容..."></textarea>
   <div>
+    <button onclick="pasteFromClipboard()">📋 從剪貼簿貼上</button>
     <button onclick="cleanText()">格式轉換</button>
     <button onclick="copyOutput()">複製結果</button>
     <button onclick="clearAll()">一鍵清空</button>
@@ -43,10 +44,25 @@
   <div class="output-label">🔍 轉換後內容：</div>
   <textarea id="output" readonly></textarea>
   <div class="note">
-    註：自動去除 Markdown、壓縮空行（保留標題前空行）、句號後自動換行。
+    註：可按 Ctrl+V 快速貼上內容，或使用「從剪貼簿貼上」按鈕取得內容。
   </div>
 
   <script>
+    window.onload = () => {
+      document.getElementById('input').focus();
+    };
+
+    function pasteFromClipboard() {
+      navigator.clipboard.readText()
+        .then(text => {
+          document.getElementById('input').value = text;
+          cleanText();
+        })
+        .catch(err => {
+          alert('❗ 無法存取剪貼簿，請手動貼上 (Ctrl+V)');
+        });
+    }
+
     function cleanText() {
       const input = document.getElementById('input').value;
       let lines = input.split('\n');
@@ -57,12 +73,10 @@
         let line = lines[i];
         let nextLine = lines[i + 1] || '';
 
-        // 是否為標題行（保留 emoji）
         const isHeaderLine = /^#+\s+/.test(line);
         const isNextHeader = /^#+\s+/.test(nextLine);
         const isPrevHeader = i > 0 && /^#+\s+/.test(lines[i - 1]);
 
-        // 處理 markdown 格式
         if (isHeaderLine) {
           line = line.replace(/^#+\s+/, '');
         }
@@ -73,7 +87,6 @@
         const isCurrentEmpty = line.trim() === '';
 
         if (isCurrentEmpty) {
-          // 只保留標題前的空行
           if (isNextHeader && !previousWasEmpty) {
             outputLines.push('');
             previousWasEmpty = true;
@@ -96,7 +109,7 @@
       const out = document.getElementById('output');
       out.select();
       document.execCommand('copy');
-      alert('已複製清理後的內容 ✅');
+      alert('✅ 已複製清理後的內容');
     }
 
     function clearAll() {

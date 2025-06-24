@@ -29,6 +29,7 @@
     }
     .output-label { margin-top: 2rem; font-weight: bold; }
     .note { margin-top: 1rem; font-size: 0.9rem; color: #666; }
+    code { background: #eee; padding: 2px 4px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -40,7 +41,11 @@
   </div>
   <div class="output-label">🔍 清理後內容：</div>
   <textarea id="output" readonly></textarea>
-  <div class="note">註：自動去除 Markdown、壓縮空行、句號後自動換行。可直接複製貼到 IG / FB / LinkedIn。</div>
+  <div class="note">
+    註：自動去除 Markdown、壓縮空行（保留標題前空行）、句號後自動換行。<br />
+    Bookmarklet 快捷鍵（請加入書籤）：<br />
+    <code>javascript:(function(){window.open('https://你的帳號.github.io/Notion2post.html','_blank','width=600,height=500');})();</code>
+  </div>
 
   <script>
     function cleanText() {
@@ -51,7 +56,6 @@
         .replace(/\*\*(.*?)\*\*/g, '$1')                 // 粗體
         .replace(/\*(.*?)\*/g, '$1')                       // 斜體
         .replace(/#+\s+(.*)/g, '$1')                        // 標題符號
-        .replace(/^\s*\n/gm, '')                           // 清掉只有空白的空行
         .replace(/\n{3,}/g, '\n\n')                        // 超過 2 行空行變 1 行
         .replace(/([。！？!?])([^\n])/g, '$1\n$2')         // 句號後自動換行
         .trim();

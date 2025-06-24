@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>貼文格式清理工具</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; color: #222; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    textarea {
+      width: 100%;
+      height: 180px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background-color: #4caf50;
+      color: white;
+      margin-right: 1rem;
+    }
+    .output-label { margin-top: 2rem; font-weight: bold; }
+    .note { margin-top: 1rem; font-size: 0.9rem; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>🧹 貼文格式清理工具</h1>
+  <textarea id="input" placeholder="貼上從 Notion 複製的內容..."></textarea>
+  <div>
+    <button onclick="cleanText()">清理格式</button>
+    <button onclick="copyOutput()">複製結果</button>
+  </div>
+  <div class="output-label">🔍 清理後內容：</div>
+  <textarea id="output" readonly></textarea>
+  <div class="note">註：自動去除 Markdown、壓縮空行、句號後自動換行。可直接複製貼到 IG / FB / LinkedIn。</div>
+
+  <script>
+    function cleanText() {
+      const input = document.getElementById('input').value;
+
+      let output = input
+        .replace(/^\s*-\s+/gm, '• ')                       // 清單符號
+        .replace(/\*\*(.*?)\*\*/g, '$1')                 // 粗體
+        .replace(/\*(.*?)\*/g, '$1')                       // 斜體
+        .replace(/#+\s+(.*)/g, '$1')                        // 標題符號
+        .replace(/^\s*\n/gm, '')                           // 清掉只有空白的空行
+        .replace(/\n{3,}/g, '\n\n')                        // 超過 2 行空行變 1 行
+        .replace(/([。！？!?])([^\n])/g, '$1\n$2')         // 句號後自動換行
+        .trim();
+
+      document.getElementById('output').value = output;
+    }
+
+    function copyOutput() {
+      const out = document.getElementById('output');
+      out.select();
+      document.execCommand('copy');
+      alert('已複製清理後的內容 ✅');
+    }
+  </script>
+</body>
+</html>

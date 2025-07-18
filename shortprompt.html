@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI圖像生成Prompt優化工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+            font-size: 1.1em;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            font-size: 16px;
+            resize: vertical;
+            transition: all 0.3s ease;
+            font-family: 'Consolas', monospace;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .stat-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            color: #333;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .warning {
+            color: #e74c3c;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .optimize-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .optimize-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .copy-btn {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            color: white;
+        }
+
+        .copy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(86, 171, 47, 0.3);
+        }
+
+        .clear-btn {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffa8a8 100%);
+            color: white;
+        }
+
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            color: white;
+            border-radius: 10px;
+            font-weight: bold;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .tips {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .tips h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .tips ul {
+            color: #555;
+            padding-left: 20px;
+        }
+
+        .tips li {
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .buttons {
+                flex-direction: column;
+            }
+
+            button {
+                min-width: 100%;
+            }
+
+            .stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 AI圖像生成Prompt優化工具</h1>
+        
+        <div class="input-section">
+            <label for="originalPrompt">原始Prompt:</label>
+            <textarea 
+                id="originalPrompt" 
+                rows="6" 
+                placeholder="點擊「一鍵優化」會自動從剪貼簿讀取並優化..."
+            ></textarea>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="originalCount">0</span>
+                    <div class="stat-label">原始字元數</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="optimizedCount">0</span>
+                    <div class="stat-label">優化後字元數</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="savedCount">0</span>
+                    <div class="stat-label">節省字元數</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="optimize-btn" onclick="pasteFromClipboard()">
+                ⚡ 一鍵優化
+            </button>
+            <button class="clear-btn" onclick="clearAll()">
+                🗑️ 清除全部
+            </button>
+        </div>
+
+        <div class="input-section">
+            <label for="optimizedPrompt">優化後Prompt (可自行微調):</label>
+            <textarea 
+                id="optimizedPrompt" 
+                rows="6" 
+                placeholder="優化結果將顯示在這裡，您可以自行微調後再複製..."
+            ></textarea>
+            
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="copy-btn" onclick="copyOutput()">
+                    📋 複製結果
+                </button>
+            </div>
+        </div>
+
+        <div class="tips">
+            <h3>💡 優化規則說明:</h3>
+            <ul>
+                <li>移除禮貌用語: please, thank you, could you等</li>
+                <li>刪除冗餘冠詞: the, a, an (保留重要描述)</li>
+                <li>移除/縮寫冗詞: stylized→styled, highly→high, ultra→ultra</li>
+                <li>簡化連接詞: and → &, with → w/, of → 's</li>
+                <li>移除多餘空格和標點符號</li>
+                <li>保持關鍵描述詞的完整性</li>
+                <li>目標：控制在500-800字元內</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        已複製到剪貼板！
+    </div>
+
+    <script>
+        let originalText = '';
+        let optimizedText = '';
+
+        // 即時更新字元數
+        document.getElementById('originalPrompt').addEventListener('input', function() {
+            originalText = this.value;
+            updateStats();
+        });
+
+        function updateStats() {
+            const originalCount = originalText.length;
+            const optimizedCount = optimizedText.length;
+            const savedCount = originalCount - optimizedCount;
+
+            document.getElementById('originalCount').textContent = originalCount;
+            document.getElementById('optimizedCount').textContent = optimizedCount;
+            document.getElementById('savedCount').textContent = savedCount;
+
+            // 超過限制時顯示警告
+            if (originalCount > 800) {
+                document.getElementById('originalCount').classList.add('warning');
+            } else {
+                document.getElementById('originalCount').classList.remove('warning');
+            }
+
+            if (optimizedCount > 800) {
+                document.getElementById('optimizedCount').classList.add('warning');
+            } else {
+                document.getElementById('optimizedCount').classList.remove('warning');
+            }
+        }
+
+        function optimizePrompt() {
+            const input = document.getElementById('originalPrompt').value;
+            if (!input.trim()) {
+                alert('請先輸入原始prompt');
+                return;
+            }
+
+            originalText = input;
+            optimizedText = optimizeText(input);
+            
+            document.getElementById('optimizedPrompt').value = optimizedText;
+            updateStats();
+            copyOutput(); // 自動複製
+        }
+
+        function optimizeText(text) {
+            let optimized = text;
+
+            // 移除禮貌用語
+            const politePhrases = [
+                'please', 'thank you', 'thanks', 'could you', 'would you',
+                'can you', 'may i', 'i would like', 'i want', 'i need',
+                'please create', 'please generate', 'please make'
+            ];
+            
+            politePhrases.forEach(phrase => {
+                const regex = new RegExp('\\b' + phrase + '\\b', 'gi');
+                optimized = optimized.replace(regex, '');
+            });
+
+            // 移除或縮寫冗詞
+            const redundantWords = {
+                'stylized': 'styled',
+                'highly': 'high',
+                'ultra': '',
+                'extremely': 'very',
+                'incredibly': 'very',
+                'absolutely': '',
+                'completely': '',
+                'totally': '',
+                'perfectly': '',
+                'amazing': 'great',
+                'fantastic': 'great',
+                'wonderful': 'great',
+                'beautiful': 'nice',
+                'gorgeous': 'nice',
+                'stunning': 'nice',
+                'magnificent': 'great',
+                'spectacular': 'great',
+                'extraordinary': 'unique',
+                'incredible': 'great',
+                'outstanding': 'great',
+                'remarkable': 'great',
+                'impressive': 'great',
+                'breathtaking': 'great',
+                'detailed': 'detail',
+                'intricate': 'detail',
+                'elaborate': 'detail',
+                'comprehensive': 'full',
+                'extensive': 'full',
+                'professional': 'pro',
+                'high-quality': 'quality',
+                'high quality': 'quality',
+                'realistic': 'real',
+                'photorealistic': 'photo',
+                'hyperrealistic': 'hyperreal',
+                'cinematic': 'film',
+                'dramatic': 'drama',
+                'dynamic': 'active',
+                'vibrant': 'bright',
+                'vivid': 'bright',
+                'intense': 'strong',
+                'powerful': 'strong',
+                'masterpiece': 'master',
+                'artwork': 'art',
+                'illustration': 'art',
+                'digital art': 'digital',
+                'concept art': 'concept'
+            };
+
+            Object.keys(redundantWords).forEach(word => {
+                const replacement = redundantWords[word];
+                const regex = new RegExp('\\b' + word + '\\b', 'gi');
+                optimized = optimized.replace(regex, replacement);
+            });
+
+            // 刪除冗餘冠詞（但保留重要描述）
+            optimized = optimized.replace(/\bthe\s+(?!most|best|main|primary|key|important|essential)/gi, '');
+            optimized = optimized.replace(/\ba\s+(?=\w)/gi, '');
+            optimized = optimized.replace(/\ban\s+(?=\w)/gi, '');
+
+            // 簡化連接詞和介詞
+            optimized = optimized.replace(/\band\b/gi, '&');
+            optimized = optimized.replace(/\bwith\b/gi, 'w/');
+            optimized = optimized.replace(/\bof the\b/gi, "'s");
+            optimized = optimized.replace(/\bin the\b/gi, 'in');
+            optimized = optimized.replace(/\bon the\b/gi, 'on');
+            optimized = optimized.replace(/\bat the\b/gi, 'at');
+
+            // 移除多餘標點和空格
+            optimized = optimized.replace(/\s*,\s*/g, ',');
+            optimized = optimized.replace(/\s*\.\s*/g, '.');
+            optimized = optimized.replace(/\s+/g, ' ');
+            optimized = optimized.replace(/^\s+|\s+$/g, '');
+
+            // 移除多餘的句號
+            optimized = optimized.replace(/\.+$/, '');
+
+            // 清理空白詞語
+            optimized = optimized.replace(/\s+,/g, ',');
+            optimized = optimized.replace(/,\s*,/g, ',');
+            optimized = optimized.replace(/\s+&/g, ' &');
+            optimized = optimized.replace(/&\s+/g, '& ');
+
+            return optimized;
+        }
+
+        function pasteFromClipboard() {
+            navigator.clipboard.readText()
+                .then(text => {
+                    if (!text.trim()) {
+                        alert('❗ 剪貼簿中沒有內容');
+                        return;
+                    }
+                    
+                    document.getElementById('originalPrompt').value = text;
+                    originalText = text;
+                    optimizedText = optimizeText(text);
+                    document.getElementById('optimizedPrompt').value = optimizedText;
+                    updateStats();
+                    showNotification('✅ 已優化完成，可自行微調後複製！');
+                })
+                .catch(err => {
+                    console.error('剪貼簿讀取錯誤:', err);
+                    // 提供手動輸入選項
+                    const manualInput = document.getElementById('originalPrompt').value;
+                    if (manualInput.trim()) {
+                        originalText = manualInput;
+                        optimizedText = optimizeText(manualInput);
+                        document.getElementById('optimizedPrompt').value = optimizedText;
+                        updateStats();
+                        showNotification('✅ 已優化完成，可自行微調後複製！');
+                    } else {
+                        alert('❗ 無法存取剪貼簿，請手動貼上內容到上方文本框後再點擊優化');
+                    }
+                });
+        }
+
+        function copyOutput() {
+            const optimizedTextarea = document.getElementById('optimizedPrompt');
+            if (!optimizedTextarea.value.trim()) {
+                alert('請先執行優化');
+                return;
+            }
+
+            navigator.clipboard.writeText(optimizedTextarea.value)
+                .then(() => {
+                    showNotification('📋 已複製到剪貼簿！');
+                })
+                .catch(err => {
+                    // 備用方案
+                    optimizedTextarea.select();
+                    document.execCommand('copy');
+                    showNotification('📋 已複製到剪貼簿！');
+                });
+        }
+
+        function showNotification(message = '已複製到剪貼簿！') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function showNotification(message = '已複製到剪貼簿！') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function clearAll() {
+            document.getElementById('originalPrompt').value = '';
+            document.getElementById('optimizedPrompt').value = '';
+            originalText = '';
+            optimizedText = '';
+            updateStats();
+        }
+
+        // 即時更新優化結果的字元數
+        document.getElementById('optimizedPrompt').addEventListener('input', function() {
+            optimizedText = this.value;
+            updateStats();
+        });
+
+        // 測試函數
+        function testOptimize() {
+            const testText = "Please create a beautiful and highly detailed illustration of a cat";
+            document.getElementById('originalPrompt').value = testText;
+            originalText = testText;
+            optimizedText = optimizeText(testText);
+            document.getElementById('optimizedPrompt').value = optimizedText;
+            updateStats();
+            console.log('測試優化:', testText, '->', optimizedText);
+        }
+
+        // 初始化
+        updateStats();
+        
+        // 添加測試按鈕點擊事件（調試用）
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('頁面加載完成');
+        });
+    </script>
+</body>
+</html>

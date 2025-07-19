@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐廳/景點蒐集地圖</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .url-input {
+            padding: 12px 20px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            min-width: 400px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .url-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        .load-btn {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .load-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .load-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .refresh-btn {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 1rem;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.loading {
+            background: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+        
+        .map-container {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        #map {
+            width: 100%;
+            height: 600px;
+            filter: saturate(1.1);
+        }
+        
+        .info-window {
+            max-width: 320px;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+        
+        .info-window h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+        
+        .info-window p {
+            margin: 6px 0;
+            color: #666;
+            font-size: 0.95rem;
+        }
+        
+        .info-window .category {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin: 2px 0;
+        }
+        
+        .info-window .highlight {
+            color: #e91e63;
+            font-weight: 500;
+        }
+        
+        .info-window .time {
+            color: #999;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-item:hover {
+            transform: translateY(-3px);
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.95rem;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .last-update {
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+            margin-top: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .url-input {
+                min-width: auto;
+                width: 100%;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            #map {
+                height: 500px;
+            }
+            
+            .stats {
+                gap: 15px;
+            }
+            
+            .stat-item {
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ 餐廳/景點資料地圖</h1>
+            <p>探索周邊美食，發現味蕾新體驗</p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <div class="control-item">
+                    <label style="font-weight: 500; color: #333; margin-bottom: 8px;">Google Apps Script Web App URL:</label>
+                    <input type="text" id="webAppUrl" class="url-input" placeholder="請輸入 Google Apps Script Web App URL" />
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <button onclick="loadSheetData()" class="load-btn" id="loadBtn">🔗 連接 Google Sheet</button>
+                <button onclick="refreshData()" class="refresh-btn" id="refreshBtn" disabled>🔄 重新整理資料</button>
+            </div>
+            
+            <div id="status" class="status" style="display: none;"></div>
+        </div>
+        
+        <div class="map-container">
+            <div id="loading" class="loading">
+                <p>🗺️ 正在載入地圖...</p>
+            </div>
+            <div id="map"></div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div id="totalCount" class="stat-number">0</div>
+                <div class="stat-label">總地點數</div>
+            </div>
+            <div class="stat-item">
+                <div id="restaurantCount" class="stat-number">0</div>
+                <div class="stat-label">餐廳</div>
+            </div>
+            <div class="stat-item">
+                <div id="attractionCount" class="stat-number">0</div>
+                <div class="stat-label">景點</div>
+            </div>
+        </div>
+        
+        <div id="lastUpdate" class="last-update" style="display: none;"></div>
+    </div>
+
+    <script>
+        let map;
+        let markers = [];
+        let infoWindow;
+        let webAppUrl = '';
+        let lastUpdateTime = null;
+        
+        // 初始化地圖
+        function initMap() {
+            // 設定台北為預設中心點
+            const defaultCenter = { lat: 25.0330, lng: 121.5654 };
+            
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 12,
+                center: defaultCenter,
+                styles: [
+                    {
+                        "featureType": "poi",
+                        "elementType": "labels",
+                        "stylers": [{"visibility": "off"}]
+                    }
+                ],
+                mapTypeControl: true,
+                streetViewControl: true,
+                fullscreenControl: true,
+                zoomControl: true
+            });
+            
+            infoWindow = new google.maps.InfoWindow();
+            
+            document.getElementById('loading').classList.remove('show');
+            
+            // 載入儲存的 URL
+            const savedUrl = localStorage.getItem('webAppUrl');
+            if (savedUrl) {
+                document.getElementById('webAppUrl').value = savedUrl;
+                webAppUrl = savedUrl;
+                document.getElementById('refreshBtn').disabled = false;
+                // 自動載入資料
+                loadSheetData();
+            }
+        }
+        
+        // 清除所有標記
+        function clearMarkers() {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+            updateStats(0, 0, 0);
+        }
+        
+        // 更新統計資訊
+        function updateStats(total, restaurants, attractions) {
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('restaurantCount').textContent = restaurants;
+            document.getElementById('attractionCount').textContent = attractions;
+        }
+        
+        // 顯示狀態訊息
+        function showStatus(message, type = 'success') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // 更新最後更新時間
+        function updateLastUpdateTime() {
+            const now = new Date();
+            lastUpdateTime = now;
+            const timeString = now.toLocaleString('zh-TW');
+            document.getElementById('lastUpdate').textContent = `最後更新: ${timeString}`;
+            document.getElementById('lastUpdate').style.display = 'block';
+        }
+        
+        // 處理 Sheet 資料並建立標記
+        function processSheetData(data) {
+            clearMarkers();
+            
+            if (!Array.isArray(data)) {
+                showStatus('資料格式錯誤：應為陣列格式', 'error');
+                return;
+            }
+            
+            let validCount = 0;
+            let restaurantCount = 0;
+            let attractionCount = 0;
+            const bounds = new google.maps.LatLngBounds();
+            
+            data.forEach((item, index) => {
+                // 檢查必要欄位（經度、緯度）
+                if (!item.經度 || !item.緯度) {
+                    console.warn(`第 ${index + 1} 筆資料缺少座標資訊`);
+                    return;
+                }
+                
+                const lat = parseFloat(item.緯度);
+                const lng = parseFloat(item.經度);
+                
+                if (isNaN(lat) || isNaN(lng)) {
+                    console.warn(`第 ${index + 1} 筆資料座標格式錯誤`);
+                    return;
+                }
+                
+                const position = { lat, lng };
+                
+                // 決定標記圖示
+                const category = item.類別 || '';
+                let iconUrl = 'https://maps.google.com/mapfiles/ms/icons/red-dot.png';
+                
+                if (category.includes('餐廳') || category.includes('美食') || category.includes('小吃')) {
+                    iconUrl = 'https://maps.google.com/mapfiles/ms/icons/restaurant.png';
+                    restaurantCount++;
+                } else if (category.includes('景點') || category.includes('觀光')) {
+                    iconUrl = 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png';
+                    attractionCount++;
+                } else {
+                    // 根據名稱判斷
+                    const name = item['餐廳或景點'] || '';
+                    if (name.includes('餐廳') || name.includes('美食') || name.includes('小吃')) {
+                        iconUrl = 'https://maps.google.com/mapfiles/ms/icons/restaurant.png';
+                        restaurantCount++;
+                    } else {
+                        attractionCount++;
+                    }
+                }
+                
+                // 建立標記
+                const marker = new google.maps.Marker({
+                    position: position,
+                    map: map,
+                    title: item['餐廳或景點'] || `地點 ${index + 1}`,
+                    animation: google.maps.Animation.DROP,
+                    icon: {
+                        url: iconUrl,
+                        scaledSize: new google.maps.Size(32, 32)
+                    }
+                });
+                
+                // 建立資訊視窗內容
+                const infoContent = createInfoWindowContent(item);
+                
+                // 點擊標記顯示資訊
+                marker.addListener('click', () => {
+                    infoWindow.setContent(infoContent);
+                    infoWindow.open(map, marker);
+                });
+                
+                markers.push(marker);
+                bounds.extend(position);
+                validCount++;
+            });
+            
+            if (validCount > 0) {
+                // 調整地圖視野以包含所有標記
+                if (validCount === 1) {
+                    map.setCenter(bounds.getCenter());
+                    map.setZoom(15);
+                } else {
+                    map.fitBounds(bounds);
+                }
+                
+                showStatus(`成功載入 ${validCount} 個地點標記`);
+                updateLastUpdateTime();
+            } else {
+                showStatus('未找到有效的地點資料', 'error');
+            }
+            
+            updateStats(validCount, restaurantCount, attractionCount);
+        }
+        
+        // 建立資訊視窗內容
+        function createInfoWindowContent(item) {
+            const name = item['餐廳或景點'] || '未命名地點';
+            const category = item['類別'] || '';
+            const highlight = item['關注重點'] || '';
+            const address = item['地址'] || '';
+            const note = item['備註'] || '';
+            const recordTime = item['紀錄時間'] || '';
+            
+            return `
+                <div class="info-window">
+                    <h3>${name}</h3>
+                    ${category ? `<span class="category">${category}</span><br><br>` : ''}
+                    ${highlight ? `<p><strong>💡 關注重點:</strong> <span class="highlight">${highlight}</span></p>` : ''}
+                    ${address ? `<p><strong>📍 地址:</strong> ${address}</p>` : ''}
+                    ${note ? `<p><strong>📝 備註:</strong> ${note}</p>` : ''}
+                    ${recordTime ? `<p class="time"><strong>🕒 紀錄時間:</strong> ${recordTime}</p>` : ''}
+                </div>
+            `;
+        }
+        
+        // 從 Google Apps Script 載入資料
+        async function loadSheetData() {
+            const urlInput = document.getElementById('webAppUrl');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showStatus('請輸入 Google Apps Script Web App URL', 'error');
+                return;
+            }
+            
+            webAppUrl = url;
+            localStorage.setItem('webAppUrl', url);
+            
+            const loadBtn = document.getElementById('loadBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+            
+            loadBtn.disabled = true;
+            refreshBtn.disabled = true;
+            showStatus('正在載入 Google Sheet 資料...', 'loading');
+            
+            try {
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                processSheetData(data);
+                refreshBtn.disabled = false;
+                
+            } catch (error) {
+                showStatus('載入失敗：' + error.message, 'error');
+                console.error('載入錯誤:', error);
+            } finally {
+                loadBtn.disabled = false;
+            }
+        }
+        
+        // 重新整理資料
+        function refreshData() {
+            if (webAppUrl) {
+                loadSheetData();
+            }
+        }
+        
+        // Enter 鍵載入
+        document.getElementById('webAppUrl').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadSheetData();
+            }
+        });
+        
+        // 示範資料（基於新的欄位結構）
+        const sampleData = [
+            {
+                "餐廳或景點": "阿宗麵線",
+                "類別": "台式小吃",
+                "關注重點": "必吃麵線",
+                "地址": "台北市萬華區峨嵋街8-1號",
+                "備註": "排隊人潮很多，建議避開用餐時間",
+                "經度": 121.5069,
+                "緯度": 25.0430,
+                "紀錄時間": "2024-12-15 14:30"
+            },
+            {
+                "餐廳或景點": "龍山寺",
+                "類別": "宗教景點",
+                "關注重點": "歷史古蹟",
+                "地址": "台北市萬華區廣州街211號",
+                "備註": "香火鼎盛的古廟，建築精美",
+                "經度": 121.4999,
+                "緯度": 25.0367,
+                "紀錄時間": "2024-12-15 15:00"
+            },
+            {
+                "餐廳或景點": "鼎泰豐",
+                "類別": "中式餐廳",
+                "關注重點": "小籠包",
+                "地址": "台北市大安區信義路二段194號",
+                "備註": "世界知名小籠包，品質穩定",
+                "經度": 121.5333,
+                "緯度": 25.0333,
+                "紀錄時間": "2024-12-15 16:20"
+            }
+        ];
+        
+        // 頁面載入完成後載入示範資料
+        window.addEventListener('load', function() {
+            // 如果沒有儲存的 URL，顯示示範資料
+            setTimeout(() => {
+                const savedUrl = localStorage.getItem('webAppUrl');
+                if (!savedUrl) {
+                    processSheetData(sampleData);
+                    showStatus('已載入示範資料，請輸入您的 Google Apps Script URL');
+                }
+            }, 1000);
+        });
+    </script>
+    
+    <!-- 載入 Google Maps API -->
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAjEbtnnBhU1e6jAMLmTlCyZZLmZK2INXA&callback=initMap&libraries=places">
+    </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>餐廳/景點蒐集地圖</title>
+    <title>餐廳景點地圖</title>
     <style>
         * {
             margin: 0;
@@ -299,7 +299,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🍽️ 餐廳/景點資料地圖</h1>
+            <h1>🍽️ 餐廳景點資訊地圖</h1>
             <p>探索周邊美食，發現味蕾新體驗</p>
         </div>
         
@@ -640,9 +640,28 @@
         });
     </script>
     
-    <!-- 載入 Google Maps API -->
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAjEbtnnBhU1e6jAMLmTlCyZZLmZK2INXA&callback=initMap&libraries=places">
+    <!-- Google Maps API 將由 Apps Script 提供 -->
+    <script>
+        // 檢查是否已載入 Google Maps API
+        function checkGoogleMapsAPI() {
+            if (typeof google !== 'undefined' && google.maps) {
+                initMap();
+            } else {
+                // 如果沒有 API，顯示提示訊息
+                document.getElementById('map').innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f5f5f5; color: #666; text-align: center; padding: 40px;">
+                        <div>
+                            <h3>🗺️ 請使用 Google Apps Script 版本</h3>
+                            <p>為了資安考量，請將此網頁程式碼整合到您的 Google Apps Script 中</p>
+                            <p>這樣 API Key 就不會暴露在前端程式碼中</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // 頁面載入後檢查 API
+        window.addEventListener('load', checkGoogleMapsAPI);
     </script>
 </body>
 </html>

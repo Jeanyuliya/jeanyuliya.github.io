@@ -196,8 +196,15 @@
         let storeData = [];
         let removedStores = new Set();
         
-        // 更新為新的 Google Sheets API endpoint
+        // Google Sheets API endpoint
         const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
+        
+        // 多個 CORS 代理選項
+        const CORS_PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://api.codetabs.com/v1/proxy?quest='
+        ];
 
         // 初始化地圖
         function initMap() {
@@ -226,6 +233,46 @@
             }
         }
 
+        // 使用多個代理嘗試載入資料
+        async function fetchWithProxy(url, proxyIndex = 0) {
+            if (proxyIndex >= CORS_PROXIES.length) {
+                // 所有代理都失敗，嘗試直接呼叫
+                console.warn('所有代理都失敗，嘗試直接呼叫 API');
+                return await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    cache: 'no-cache'
+                });
+            }
+
+            const proxy = CORS_PROXIES[proxyIndex];
+            const proxiedUrl = proxy + encodeURIComponent(url);
+            
+            try {
+                console.log(`嘗試使用代理 ${proxyIndex + 1}: ${proxy}`);
+                const response = await fetch(proxiedUrl, {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Accept': 'application/json, text/plain, */*'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return response;
+            } catch (error) {
+                console.warn(`代理 ${proxyIndex + 1} 失敗:`, error.message);
+                // 遞迴嘗試下一個代理
+                return await fetchWithProxy(url, proxyIndex + 1);
+            }
+        }
+
         // 載入店家資料
         async function loadStoreData() {
             const loadBtn = document.getElementById('loadData');
@@ -235,52 +282,55 @@
             try {
                 showMessage('正在從 Google Sheets 載入資料...', 'info');
                 
-               // 使用 CORS 代理來避免 CORS 問題
-const PROXY_URL = 'https://api.allorigins.win/raw?url=';
-const PROXIED_URL = PROXY_URL + encodeURIComponent(SHEETS_API_URL);
+                const response = await fetchWithProxy(SHEETS_API_URL);
+                
+                let data;
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    // 如果不是 JSON，嘗試解析文字
+                    const text = await response.text();
+                    try {
+                        data = JSON.parse(text);
+                    } catch (parseError) {
+                        console.error('JSON 解析錯誤:', parseError);
+                        throw new Error('回應格式錯誤，無法解析 JSON 資料');
+                    }
+                }
 
-// 先嘗試使用代理
-let response;
-try {
-    response = await fetch(PROXIED_URL, {
-        method: 'GET',
-        cache: 'no-cache'
-    });
-} catch (proxyError) {
-    console.warn('代理失敗，嘗試直接呼叫:', proxyError);
-    // 如果代理失敗，回到原本的方法
-    response = await fetch(SHEETS_API_URL, {
-        method: 'GET',
-        mode: 'cors',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        cache: 'no-cache'
-    });
-}
+                // 檢查是否有錯誤回應
+                if (data.success === false) {
+                    throw new Error(data.message || data.error || '載入資料失敗');
+                }
 
-if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-}
+                // 如果資料是包裝在回應物件中
+                const storeArray = Array.isArray(data) ? data : (data.data || data);
 
-const data = await response.json();
+                if (!Array.isArray(storeArray)) {
+                    console.error('收到的資料:', data);
+                    throw new Error('資料格式錯誤或無資料');
+                }
+                
+                if (storeArray.length === 0) {
+                    throw new Error('Google Sheets 中沒有資料');
+                }
 
-// 檢查是否有錯誤回應
-if (data.success === false) {
-    throw new Error(data.message || data.error || '載入資料失敗');
-}
+                storeData = storeArray;
+                createMarkers();
 
-// 如果資料是包裝在回應物件中
-const storeArray = Array.isArray(data) ? data : (data.data || data);
+                showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
+                updateStats();
 
-if (!Array.isArray(storeArray)) {
-    throw new Error('資料格式錯誤或無資料');
-}
-storeData = storeArray;
-createMarkers();
-
-showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
-updateStats();
+            } catch (error) {
+                console.error('載入資料錯誤:', error);
+                showMessage(`載入失敗: ${error.message}`, 'error');
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.textContent = '📥 載入店家資料';
+            }
+        }
 
         // 創建地圖標記
         function createMarkers() {
@@ -441,20 +491,11 @@ updateStats();
             }, 5000);
         }
 
-        // 將已拜訪狀態傳送回 Google Sheets
+        // 將已拜訪狀態傳送回 Google Sheets (使用代理)
         async function markAsVisitedInSheet(rowIndex, storeName) {
             try {
-                const response = await fetch(
-                    `${SHEETS_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}`,
-                    {
-                        method: 'GET',
-                        mode: 'cors'
-                    }
-                );
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                const updateUrl = `${SHEETS_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}`;
+                const response = await fetchWithProxy(updateUrl);
                 
                 const result = await response.json();
                 

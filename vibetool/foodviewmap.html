@@ -235,8 +235,15 @@
             try {
                 showMessage('正在從 Google Sheets 載入資料...', 'info');
                 
-                // 使用 fetch 直接請求 Google Apps Script
-                const response = await fetch(SHEETS_API_URL);
+                // 使用 fetch 請求，添加 CORS 模式
+                const response = await fetch(SHEETS_API_URL, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    cache: 'no-cache'
+                });
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -244,11 +251,19 @@
                 
                 const data = await response.json();
                 
-                if (!data || !Array.isArray(data)) {
+                // 檢查是否有錯誤回應
+                if (data.success === false) {
+                    throw new Error(data.message || data.error || '載入資料失敗');
+                }
+                
+                // 如果資料是包裝在回應物件中
+                const storeArray = Array.isArray(data) ? data : (data.data || data);
+                
+                if (!Array.isArray(storeArray)) {
                     throw new Error('資料格式錯誤或無資料');
                 }
 
-                storeData = data;
+                storeData = storeArray;
                 createMarkers();
                 
                 showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
@@ -256,7 +271,11 @@
 
             } catch (error) {
                 console.error('載入資料錯誤:', error);
-                showMessage(`載入失敗: ${error.message}。請檢查 Google Apps Script 是否已部署且允許匿名存取`, 'error');
+                if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    showMessage('載入失敗: 網路連線問題或 CORS 設定問題。請確認 Google Apps Script 已正確設定 CORS headers', 'error');
+                } else {
+                    showMessage(`載入失敗: ${error.message}`, 'error');
+                }
             } finally {
                 loadBtn.disabled = false;
                 loadBtn.textContent = '📥 載入店家資料';

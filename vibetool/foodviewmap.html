@@ -235,52 +235,52 @@
             try {
                 showMessage('正在從 Google Sheets 載入資料...', 'info');
                 
-                // 使用 fetch 請求，添加 CORS 模式
-                const response = await fetch(SHEETS_API_URL, {
-                    method: 'GET',
-                    mode: 'cors',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    cache: 'no-cache'
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                
-                // 檢查是否有錯誤回應
-                if (data.success === false) {
-                    throw new Error(data.message || data.error || '載入資料失敗');
-                }
-                
-                // 如果資料是包裝在回應物件中
-                const storeArray = Array.isArray(data) ? data : (data.data || data);
-                
-                if (!Array.isArray(storeArray)) {
-                    throw new Error('資料格式錯誤或無資料');
-                }
+               // 使用 CORS 代理來避免 CORS 問題
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+const PROXIED_URL = PROXY_URL + encodeURIComponent(SHEETS_API_URL);
 
-                storeData = storeArray;
-                createMarkers();
-                
-                showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
-                updateStats();
+// 先嘗試使用代理
+let response;
+try {
+    response = await fetch(PROXIED_URL, {
+        method: 'GET',
+        cache: 'no-cache'
+    });
+} catch (proxyError) {
+    console.warn('代理失敗，嘗試直接呼叫:', proxyError);
+    // 如果代理失敗，回到原本的方法
+    response = await fetch(SHEETS_API_URL, {
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        cache: 'no-cache'
+    });
+}
 
-            } catch (error) {
-                console.error('載入資料錯誤:', error);
-                if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                    showMessage('載入失敗: 網路連線問題或 CORS 設定問題。請確認 Google Apps Script 已正確設定 CORS headers', 'error');
-                } else {
-                    showMessage(`載入失敗: ${error.message}`, 'error');
-                }
-            } finally {
-                loadBtn.disabled = false;
-                loadBtn.textContent = '📥 載入店家資料';
-            }
-        }
+if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+}
+
+const data = await response.json();
+
+// 檢查是否有錯誤回應
+if (data.success === false) {
+    throw new Error(data.message || data.error || '載入資料失敗');
+}
+
+// 如果資料是包裝在回應物件中
+const storeArray = Array.isArray(data) ? data : (data.data || data);
+
+if (!Array.isArray(storeArray)) {
+    throw new Error('資料格式錯誤或無資料');
+}
+storeData = storeArray;
+createMarkers();
+
+showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
+updateStats();
 
         // 創建地圖標記
         function createMarkers() {

@@ -114,6 +114,14 @@
             margin: 10px 0;
         }
 
+        .info {
+            color: #0c5460;
+            background: #d1ecf1;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
         .info-window {
             max-width: 300px;
             padding: 10px;
@@ -188,9 +196,8 @@
         let storeData = [];
         let removedStores = new Set();
         
-        // Google Sheets API endpoint 和 Google Maps API endpoint
-        const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyN6RAGbDrKD68P1TdRiPBUV1-rpgSpizT-fGKtABZX_T6tZQVfc8BIjCAwlpKSS0Q2IQ/exec';
-        const MAPS_API_URL = 'https://script.google.com/macros/s/AKfycbyiABSDgNp-zrlWmINtpGg_wRmhaKbRxBiWiIZNYQV9U1kpiTFPo3mS-k1nvmUDzLri/exec';
+        // 更新為新的 Google Sheets API endpoint
+        const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbxr-SdHzhj63OayFwPfDpsze1e-RZit99aFa6ZQsLxCF-flTsi2eKaGmLzNCfLArf7otQ/exec';
 
         // 初始化地圖
         function initMap() {
@@ -228,14 +235,20 @@
             try {
                 showMessage('正在從 Google Sheets 載入資料...', 'info');
                 
-                // 使用 JSONP 方式載入資料以避免 CORS 問題
-                const response = await fetchWithJSONP(SHEETS_API_URL);
+                // 使用 fetch 直接請求 Google Apps Script
+                const response = await fetch(SHEETS_API_URL);
                 
-                if (!response || !Array.isArray(response)) {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data || !Array.isArray(data)) {
                     throw new Error('資料格式錯誤或無資料');
                 }
 
-                storeData = response;
+                storeData = data;
                 createMarkers();
                 
                 showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
@@ -243,48 +256,11 @@
 
             } catch (error) {
                 console.error('載入資料錯誤:', error);
-                showMessage(`載入失敗: ${error.message}。請檢查 Google Apps Script 設定是否允許匿名存取`, 'error');
+                showMessage(`載入失敗: ${error.message}。請檢查 Google Apps Script 是否已部署且允許匿名存取`, 'error');
             } finally {
                 loadBtn.disabled = false;
                 loadBtn.textContent = '📥 載入店家資料';
             }
-        }
-
-        // JSONP 方式載入資料以避免 CORS 問題
-        function fetchWithJSONP(url) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                
-                // 創建 script 標籤
-                const script = document.createElement('script');
-                const timeoutId = setTimeout(() => {
-                    cleanup();
-                    reject(new Error('請求超時'));
-                }, 10000);
-                
-                const cleanup = () => {
-                    clearTimeout(timeoutId);
-                    delete window[callbackName];
-                    if (script.parentNode) {
-                        script.parentNode.removeChild(script);
-                    }
-                };
-                
-                window[callbackName] = (data) => {
-                    cleanup();
-                    resolve(data);
-                };
-                
-                script.onerror = () => {
-                    cleanup();
-                    reject(new Error('載入失敗'));
-                };
-                
-                // 添加 callback 參數到 URL
-                const separator = url.includes('?') ? '&' : '?';
-                script.src = `${url}${separator}callback=${callbackName}`;
-                document.head.appendChild(script);
-            });
         }
 
         // 創建地圖標記
@@ -410,7 +386,7 @@
             }
         }
 
-        // 清除所有標記（內部功能，移除按鈕版本）
+        // 清除所有標記（內部功能）
         function clearMarkers() {
             markers.forEach(marker => {
                 marker.setMap(null);
@@ -449,15 +425,25 @@
         // 將已拜訪狀態傳送回 Google Sheets
         async function markAsVisitedInSheet(rowIndex, storeName) {
             try {
-                const response = await fetchWithJSONP(
-                    `${SHEETS_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}`
+                const response = await fetch(
+                    `${SHEETS_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}`,
+                    {
+                        method: 'GET',
+                        mode: 'cors'
+                    }
                 );
                 
-                if (response.success) {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
                     console.log('已成功更新 Google Sheets');
-                    return response;
+                    return result;
                 } else {
-                    throw new Error(response.message || '更新 Google Sheets 失敗');
+                    throw new Error(result.message || '更新 Google Sheets 失敗');
                 }
             } catch (error) {
                 console.error('傳送資料到 Google Sheets 時發生錯誤:', error);
@@ -465,13 +451,11 @@
             }
         }
 
-        // 載入 Google Maps API 和初始化
+        // 載入 Google Maps API
         async function loadGoogleMapsAPI() {
             try {
                 showMessage('正在載入地圖服務...', 'info');
                 
-                // 直接載入 Google Maps API（不依賴您的 Apps Script）
-                // 先嘗試無 API key 的版本
                 const script = document.createElement('script');
                 
                 script.onload = () => {

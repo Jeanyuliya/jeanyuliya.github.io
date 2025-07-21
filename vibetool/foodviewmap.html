@@ -162,6 +162,13 @@
     <div class="container">
         <div class="controls">
             <button id="loadData" onclick="loadStoreData()">📥 載入店家資料</button>
+            <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="addressSearch" placeholder="輸入地址或區域名稱..." 
+                       style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px;">
+                <button onclick="searchAndMoveMap()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                    🔍 搜尋位置
+                </button>
+            </div>
         </div>
 
         <div class="map-container">
@@ -305,16 +312,75 @@
                     throw new Error(data.message || data.error || '載入資料失敗');
                 }
 
-                // 如果資料是包裝在回應物件中
-                const storeArray = Array.isArray(data) ? data : (data.data || data);
+                // 處理不同的資料格式
+                let storeArray;
+                
+                // 如果是陣列，直接使用
+                if (Array.isArray(data)) {
+                    storeArray = data;
+                } else if (data.data && Array.isArray(data.data)) {
+                    // 如果資料包在 data 屬性中
+                    storeArray = data.data;
+                } else if (data.values && Array.isArray(data.values)) {
+                    // Google Sheets API 有時會用 values 格式
+                    const headers = data.values[0];
+                    storeArray = data.values.slice(1).map((row, index) => {
+                        const store = {};
+                        headers.forEach((header, i) => {
+                            // 清理標題名稱並映射到標準欄位
+                            const cleanHeader = header.trim().toLowerCase();
+                            const fieldMap = {
+                                '店名': 'name',
+                                '名稱': 'name', 
+                                'name': 'name',
+                                '類別': 'type',
+                                '分類': 'type',
+                                'type': 'type',
+                                '關注重點': 'focus',
+                                '重點': 'focus',
+                                'focus': 'focus',
+                                '地址': 'address',
+                                'address': 'address',
+                                '備註': 'description',
+                                '說明': 'description',
+                                'description': 'description',
+                                '緯度': 'lat',
+                                'lat': 'lat',
+                                'latitude': 'lat',
+                                '經度': 'lng',
+                                'lng': 'lng',
+                                'longitude': 'lng',
+                                '紀錄時間': 'recordTime',
+                                '時間': 'recordTime',
+                                'time': 'recordTime',
+                                '已拜訪': 'visited',
+                                'visited': 'visited'
+                            };
+                            
+                            const mappedField = fieldMap[cleanHeader] || cleanHeader;
+                            store[mappedField] = row[i] || '';
+                        });
+                        store.rowIndex = index + 2; // Google Sheets 行號從2開始（跳過標題行）
+                        return store;
+                    });
+                } else {
+                    // 嘗試直接使用物件
+                    storeArray = [data];
+                }
 
-                if (!Array.isArray(storeArray)) {
-                    console.error('收到的資料:', data);
+                if (!Array.isArray(storeArray) || storeArray.length === 0) {
+                    console.error('收到的資料結構:', data);
                     throw new Error('資料格式錯誤或無資料');
                 }
                 
-                if (storeArray.length === 0) {
-                    throw new Error('Google Sheets 中沒有資料');
+                // 檢查資料完整性並顯示調試資訊
+                console.log('載入的店家資料:', storeArray);
+                const validStores = storeArray.filter(store => store.lat && store.lng && store.name);
+                console.log(`有效店家數量: ${validStores.length} / ${storeArray.length}`);
+                
+                if (validStores.length === 0) {
+                    showMessage('警告：載入的資料中沒有包含完整的店名、經度、緯度資訊', 'error');
+                    console.log('第一筆資料範例:', storeArray[0]);
                 }
 
                 storeData = storeArray;
@@ -511,7 +577,72 @@
             }
         }
 
-        // 載入 Google Maps API
+        // 搜尋並移動地圖到指定位置
+        async function searchAndMoveMap() {
+            const searchInput = document.getElementById('addressSearch');
+            const address = searchInput.value.trim();
+            
+            if (!address) {
+                showMessage('請輸入地址或區域名稱', 'error');
+                return;
+            }
+
+            try {
+                showMessage('正在搜尋位置...', 'info');
+                
+                // 使用 Google Geocoding API
+                const geocoder = new google.maps.Geocoder();
+                
+                geocoder.geocode({ 
+                    address: address,
+                    region: 'TW' // 限制在台灣
+                }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        const location = results[0].geometry.location;
+                        
+                        // 移動地圖到搜尋位置
+                        map.setCenter(location);
+                        map.setZoom(15);
+                        
+                        // 創建一個暫時標記顯示搜尋結果
+                        const tempMarker = new google.maps.Marker({
+                            position: location,
+                            map: map,
+                            title: '搜尋結果: ' + results[0].formatted_address,
+                            icon: {
+                                url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                                scaledSize: new google.maps.Size(40, 40)
+                            }
+                        });
+                        
+                        // 5秒後移除暫時標記
+                        setTimeout(() => {
+                            tempMarker.setMap(null);
+                        }, 5000);
+                        
+                        showMessage(`已移動到: ${results[0].formatted_address}`, 'success');
+                    } else {
+                        showMessage('找不到指定的位置，請檢查地址是否正確', 'error');
+                    }
+                });
+                
+            } catch (error) {
+                console.error('地址搜尋錯誤:', error);
+                showMessage('地址搜尋失敗: ' + error.message, 'error');
+            }
+        }
+
+        // 按 Enter 鍵也可以搜尋
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('addressSearch');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        searchAndMoveMap();
+                    }
+                });
+            }
+        });
         async function loadGoogleMapsAPI() {
             try {
                 showMessage('正在載入地圖服務...', 'info');
@@ -526,7 +657,7 @@
                     showMessage('地圖 API 載入失敗，請檢查網路連線', 'error');
                 };
                 
-                script.src = 'https://maps.googleapis.com/maps/api/js?callback=initMap';
+                script.src = 'https://maps.googleapis.com/maps/api/js?callback=initMap&libraries=geocoding';
                 script.defer = true;
                 script.async = true;
                 document.head.appendChild(script);

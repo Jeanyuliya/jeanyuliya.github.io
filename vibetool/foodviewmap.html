@@ -60,14 +60,14 @@
      *  可調參數區
      **********************/
 
-    // 你的 Apps Script Web App URL（不要帶任何查詢參數）
+    // ✅ 你的 Apps Script Web App（不要帶任何 query）
     const BASE_API_URL =
       'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
 
-    // Google Maps Key（可留空；若有就會加 key=）
-    const GOOGLE_MAPS_KEY = ''; // e.g. 'AIzaSy...'
+    // ✅ Google Maps Key（可留空；若有就會加 key=）
+    const GOOGLE_MAPS_KEY = ''; // 例：'AIzaSy...'
 
-    // 可切換要不要只繪製未拜訪的點（還是以 onlyUnvisited=true 為主）
+    // ✅ 地圖只畫未拜訪（仍會再抓一次全部做統計）
     const DRAW_ONLY_UNVISITED = true;
 
     /**********************
@@ -75,22 +75,22 @@
      **********************/
     let map;
     let markers = [];
-    let storeData = [];     // 目前畫在地圖上的店家（通常是未拜訪）
+    let storeData = [];     // 地圖上畫的資料（通常是未拜訪）
     let removedStores = new Set(); // 本次互動中被標記為已拜訪的 index
 
-    // CORS 代理（先直連，失敗再用代理）
-    const CORS_PROXIES = [
+    // CORS 方案（先直連，失敗再代理）
+    const CORS_INVOCATIONS = [
       (url)=>fetch(url,{method:'GET',mode:'cors',cache:'no-cache',headers:{'Accept':'application/json, text/plain, */*'}}), // 直連
       (url)=>fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url)),
       (url)=>fetch('https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url)),
       (url)=>fetch('https://cors.isomorphic-git.org/'+url),
     ];
 
-    // API URL 建構器
-    const buildUrl = (params = {}) => {
-      const usp = new URLSearchParams({...params, _: Date.now()});
-      return `${BASE_API_URL}?${usp.toString()}`;
-    };
+    // 🔧 URL builders —— 避免 ? 與 & 亂掉
+    const DATA_URL   = () => `${BASE_API_URL}?onlyUnvisited=${DRAW_ONLY_UNVISITED?'true':'false'}&t=${Date.now()}`;
+    const TOTALS_URL = () => `${BASE_API_URL}?t=${Date.now()}`;
+    const UPDATE_URL = (rowIndex,storeName) =>
+      `${BASE_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}&t=${Date.now()}`;
 
     /**********************
      *  地圖初始化
@@ -126,9 +126,9 @@
      **********************/
     async function fetchWithFallback(url) {
       let lastErr;
-      for (const invoker of CORS_PROXIES) {
+      for (const call of CORS_INVOCATIONS) {
         try {
-          const res = await invoker(url);
+          const res = await call(url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res;
         } catch (e) {
@@ -138,14 +138,15 @@
       throw lastErr || new Error('所有通道皆失敗');
     }
 
+    // 從各種可能結構標準化成我們要的欄位
     function normalizeRowObject(obj, idxBase=2) {
-      // field 映射
       const pick = (o, keys)=> keys.find(k => k in o && o[k] !== undefined && o[k] !== null);
-      const get = (o, names, d='')=>{
+      const get  = (o, names, d='')=>{
         const k = pick(o, names);
         if (!k) return d;
         return (o[k] ?? d);
       };
+
       const name   = get(obj, ['餐廳或景點','店名','名稱','name']);
       const cat    = get(obj, ['類別','分類','category']);
       const focus  = get(obj, ['關注重點','重點','focus']);
@@ -175,28 +176,20 @@
     }
 
     function parseUnknownResponse(data) {
-      // 已是陣列：每筆當成物件 normalize
-      if (Array.isArray(data)) {
-        return data.map((o, i)=> normalizeRowObject(o, i+2));
-      }
-      // 有 data: [...]
-      if (data && Array.isArray(data.data)) {
-        return data.data.map((o, i)=> normalizeRowObject(o, i+2));
-      }
-      // 有 values: [ [headers...], [...], ... ]
+      try {
+        if (typeof data === 'string') data = JSON.parse(data);
+      } catch {}
+      if (Array.isArray(data))       return data.map((o,i)=>normalizeRowObject(o,i+2));
+      if (data && Array.isArray(data.data))
+        return data.data.map((o,i)=>normalizeRowObject(o,i+2));
       if (data && Array.isArray(data.values)) {
         const headers = data.values[0].map(h=>String(h).trim());
         return data.values.slice(1).map((row,i)=>{
-          const obj = {};
-          headers.forEach((h,idx)=> obj[h] = row[idx]);
-          obj.rowIndex = i+2;
-          return normalizeRowObject(obj, i+2);
+          const obj = {}; headers.forEach((h,idx)=> obj[h]=row[idx]);
+          obj.rowIndex = i+2; return normalizeRowObject(obj,i+2);
         });
       }
-      // 物件：包一層
-      if (data && typeof data === 'object') {
-        return [ normalizeRowObject(data, 2) ];
-      }
+      if (data && typeof data==='object') return [normalizeRowObject(data,2)];
       return [];
     }
 
@@ -207,26 +200,20 @@
       showMessage('正在從 Google Sheets 載入資料…','info');
 
       try {
-        // 1) 先抓「要畫的資料」：通常是 onlyUnvisited=true
-        const listUrl = buildUrl({ onlyUnvisited: DRAW_ONLY_UNVISITED ? 'true' : 'false' });
-        const res1 = await fetchWithFallback(listUrl);
-        let raw1 = await res1.text();
-        try { raw1 = JSON.parse(raw1); } catch {}
-        const arr1 = parseUnknownResponse(raw1)
-          .filter(s => s.lat && s.lng && s.name);
-        // 若回傳也包含 visited 的，畫圖時仍只畫未拜訪
-        storeData = DRAW_ONLY_UNVISITED ? arr1.filter(s => !isVisited(s)) : arr1;
+        // 1) 先抓要畫的（未拜訪）
+        const res1 = await fetchWithFallback(DATA_URL());
+        const text1 = await res1.text();
+        const arr1  = parseUnknownResponse(text1).filter(s => s.lat && s.lng && s.name);
+        storeData   = DRAW_ONLY_UNVISITED ? arr1.filter(s => !isVisited(s)) : arr1;
 
-        // 2) 再抓一次全部資料用來算總數（這樣「總店家數量 / 已拜訪 / 未拜訪」才會正確）
+        // 2) 再抓全部做統計
         let totals = { total: 0, visited: 0, unvisited: 0 };
         try {
-          const allUrl = buildUrl(); // 不帶 onlyUnvisited
-          const res2 = await fetchWithFallback(allUrl);
-          let raw2 = await res2.text();
-          try { raw2 = JSON.parse(raw2); } catch {}
-          const all = parseUnknownResponse(raw2);
-          totals.total = all.length;
-          totals.visited = all.reduce((n, s)=> n + (isVisited(s) ? 1 : 0), 0);
+          const res2 = await fetchWithFallback(TOTALS_URL());
+          const text2 = await res2.text();
+          const all   = parseUnknownResponse(text2);
+          totals.total     = all.length;
+          totals.visited   = all.reduce((n,s)=> n + (isVisited(s)?1:0), 0);
           totals.unvisited = totals.total - totals.visited;
         } catch (e) {
           console.warn('統計補抓失敗，改用當前資料估算：', e);
@@ -237,8 +224,8 @@
 
         createMarkers();
         applyTotalsToUI(totals);
-        showMessage(`成功載入 ${storeData.length} 筆（地圖繪製筆數）`,`success`);
-        updateStatsUI(); // 讓 activeMarkers 正確
+        showMessage(`成功載入 ${storeData.length} 筆（地圖繪製筆數）`,'success');
+        updateActiveMarkersUI();
 
       } catch (err) {
         console.error('載入資料錯誤:', err);
@@ -249,13 +236,9 @@
     }
 
     function applyTotalsToUI(totals) {
-      const totalEl   = document.getElementById('totalStores');
-      const visitedEl = document.getElementById('visitedTotal');
-      const activeEl  = document.getElementById('activeMarkers');
-      totalEl.textContent   = totals.total;
-      visitedEl.textContent = totals.visited;
-      // activeMarkers 交由 updateStatsUI() 以目前畫在地圖上的 markers 為準
-      activeEl.textContent  = markers.length;
+      document.getElementById('totalStores').textContent   = totals.total;
+      document.getElementById('visitedTotal').textContent  = totals.visited;
+      document.getElementById('activeMarkers').textContent = markers.length; // 以實際畫在地圖的為準
     }
 
     /**********************
@@ -269,9 +252,9 @@
     function createMarkers() {
       clearMarkers();
       storeData.forEach((store, index) => {
-        if (isVisited(store)) return; // 保險：即使只抓未拜訪，也跳過已拜訪
+        if (isVisited(store)) return; // 保險
         const lat = parseFloat(store.lat), lng = parseFloat(store.lng);
-        if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
         const marker = new google.maps.Marker({
           map, position: {lat, lng},
@@ -309,21 +292,19 @@
         markers.forEach(m => bounds.extend(m.getPosition()));
         map.fitBounds(bounds);
       }
-      updateStatsUI();
+      updateActiveMarkersUI();
     }
 
-    function updateStatsUI() {
+    function updateActiveMarkersUI() {
       document.getElementById('activeMarkers').textContent = markers.length;
-      // 註：visitedTotal 由 applyTotalsToUI 或 mark 後自調整
     }
 
     /**********************
-     *  標記為已拜訪
+     *  標記為已拜訪（寫回表單）
      **********************/
     async function markAsVisitedInSheet(rowIndex, storeName) {
-      // 只負責建 url & 發送；不做 UI 判斷的重複 if/else（避免「小修正3」的重覆問題）
-      const url = buildUrl({ action:'markVisited', rowIndex, storeName });
-      const res = await fetchWithFallback(url);
+      // 僅建 URL 與呼叫；成功條件：後端回 { success: true }
+      const res  = await fetchWithFallback(UPDATE_URL(rowIndex, storeName));
       const json = await res.json();
       if (!json || json.success !== true) {
         throw new Error(json?.message || '更新 Google Sheets 失敗');
@@ -338,23 +319,23 @@
 
       try {
         showMessage('正在更新資料…','info');
+        // ✅ 一定要等待後端回 success:true
         await markAsVisitedInSheet(store.rowIndex, store.name);
 
-        // 關掉 info 視窗與地圖移除
+        // 關掉 info 視窗與從地圖移除
         marker.infoWindow?.close();
         marker.setMap(null);
         markers = markers.filter(m => m !== marker);
 
-        // 當前 session 標記
-        removedStores.add(storeIndex);
-        // 本地也標成已拜訪，之後不會再被畫出
+        // 本地資料也標成已拜訪，避免重畫
         storeData[storeIndex].completed = true;
+        removedStores.add(storeIndex);
 
-        // 讓下方「已拜訪店家」數量 +1（總數）
+        // UI 統計同步 +1（總數不變、已拜訪 +1、待拜訪 -1）
         const visitedEl = document.getElementById('visitedTotal');
         visitedEl.textContent = String(parseInt(visitedEl.textContent||'0',10) + 1);
+        updateActiveMarkersUI();
 
-        updateStatsUI();
         showMessage(`已將「${store.name}」標記為已拜訪並同步到 Google Sheets`,'success');
       } catch (e) {
         console.error(e);
@@ -440,10 +421,8 @@
       setTimeout(()=> el.remove(), 5000);
     }
 
-    // 載入後就載入地圖
-    window.addEventListener('load', ()=>{
-      loadGoogleMapsAPI();
-    });
+    // 頁面載入：先載入地圖
+    window.addEventListener('load', ()=>{ loadGoogleMapsAPI(); });
   </script>
 </body>
 </html>

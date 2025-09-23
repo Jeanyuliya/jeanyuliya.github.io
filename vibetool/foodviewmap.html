@@ -321,6 +321,9 @@
                 } else if (data.data && Array.isArray(data.data)) {
                     // 如果資料包在 data 屬性中
                     storeArray = data.data;
+                    lastMeta   = data.meta || null;
+                    } else {
+  storeArray = [data];
                 } else if (data.values && Array.isArray(data.values)) {
                     // Google Sheets API 有時會用 values 格式
                     const headers = data.values[0];
@@ -531,13 +534,22 @@
             });
             markers = [];
         }
+let lastMeta = null; // 新增：記住後端回來的統計
 
-        // 更新統計資訊
-        function updateStats() {
-            document.getElementById('totalStores').textContent = storeData.length;
-            document.getElementById('activeMarkers').textContent = markers.length;
-            document.getElementById('removedMarkers').textContent = removedStores.size;
-        }
+function updateStats() {
+  // 如果後端有 meta，就用後端的
+  if (lastMeta) {
+    document.getElementById('totalStores').textContent   = lastMeta.total ?? storeData.length;
+    document.getElementById('activeMarkers').textContent = lastMeta.unvisited ?? markers.length;
+    document.getElementById('removedMarkers').textContent= lastMeta.visited ?? removedStores.size;
+  } else {
+    // 沒有 meta 時的退路
+    const visitedCount = storeData.filter(isVisited).length;
+    document.getElementById('totalStores').textContent   = storeData.length;
+    document.getElementById('activeMarkers').textContent = storeData.length - visitedCount;
+    document.getElementById('removedMarkers').textContent= visitedCount;
+  }
+}
 
         // 顯示訊息
         function showMessage(message, type = 'info') {

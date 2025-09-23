@@ -205,7 +205,9 @@
         
         // Google Sheets API endpoint
         const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec?onlyUnvisited=true&t=${Date.now()}';
-        
+        const res = await fetch(SHEETS_API_URL, { cache: 'no-store' });
+        const data = await res.json();
+       
         // 多個 CORS 代理選項
         const CORS_PROXIES = [
             'https://api.allorigins.win/raw?url=',

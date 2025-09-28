@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IG 封面圖製作工具</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+        
+        .controls {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .preview-container {
+            position: sticky;
+            top: 20px;
+        }
+        
+        .canvas-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        #canvas {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            max-width: 100%;
+            cursor: crosshair;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        input[type="text"], input[type="file"], select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        input[type="text"]:focus, input[type="file"]:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .position-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .range-value {
+            display: inline-block;
+            width: 40px;
+            text-align: center;
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+        
+        .download-btn {
+            background: linear-gradient(135deg, #8b9dc3 0%, #a8a8a8 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        .size-info {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .preview-container {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="title">IG 封面圖製作工具</h1>
+    
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="textInput">輸入文字（使用 Enter 換行）：</label>
+                <textarea id="textInput" rows="3" placeholder="請輸入要顯示的文字&#10;可使用 Enter 換行">您的文字</textarea>
+            </div>
+            
+            <div class="control-group">
+                <label for="imageUpload">上傳圖片：</label>
+                <input type="file" id="imageUpload" accept="image/*">
+            </div>
+            
+            <div class="control-group">
+                <label>文字位置微調：</label>
+                <div class="position-controls">
+                    <div>
+                        <label for="textX">水平位置：</label>
+                        <input type="range" id="textX" min="0" max="1080" value="540">
+                        <span class="range-value" id="textXValue">540</span>
+                    </div>
+                    <div>
+                        <label for="textY">垂直位置：</label>
+                        <input type="range" id="textY" min="0" max="1080" value="540">
+                        <span class="range-value" id="textYValue">540</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="fontSize">文字大小：</label>
+                <input type="range" id="fontSize" min="30" max="120" value="60">
+                <span class="range-value" id="fontSizeValue">60</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="imagePosition">圖片位置：</label>
+                <select id="imagePosition">
+                    <option value="bottom-right">右下</option>
+                    <option value="bottom-center">中下</option>
+                    <option value="bottom-left">左下</option>
+                </select>
+            </div>
+            
+            <button class="download-btn" onclick="downloadImage()">下載封面圖</button>
+        </div>
+        
+        <div class="preview-container">
+            <div class="canvas-container">
+                <div class="size-info">尺寸: 1080 x 1080 (IG正方形)</div>
+                <canvas id="canvas" width="1080" height="1080"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const textInput = document.getElementById('textInput');
+        const imageUpload = document.getElementById('imageUpload');
+        const textXSlider = document.getElementById('textX');
+        const textYSlider = document.getElementById('textY');
+        const fontSizeSlider = document.getElementById('fontSize');
+        const imagePositionSelect = document.getElementById('imagePosition');
+        
+        let uploadedImage = null;
+        let isDragging = false;
+        let textX = 540;
+        let textY = 540;
+        
+        // 更新範圍值顯示
+        function updateRangeValue(slider, valueElement) {
+            valueElement.textContent = slider.value;
+        }
+        
+        textXSlider.oninput = function() {
+            textX = parseInt(this.value);
+            updateRangeValue(this, document.getElementById('textXValue'));
+            drawCanvas();
+        };
+        
+        textYSlider.oninput = function() {
+            textY = parseInt(this.value);
+            updateRangeValue(this, document.getElementById('textYValue'));
+            drawCanvas();
+        };
+        
+        fontSizeSlider.oninput = function() {
+            updateRangeValue(this, document.getElementById('fontSizeValue'));
+            drawCanvas();
+        };
+        
+        // 圖片上傳處理
+        imageUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        uploadedImage = img;
+                        drawCanvas();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // 文字輸入處理
+        textInput.addEventListener('input', drawCanvas);
+        
+        // 圖片位置選擇處理
+        imagePositionSelect.addEventListener('change', drawCanvas);
+        
+        // 滑鼠拖拽文字位置
+        canvas.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            updateTextPosition(e);
+        });
+        
+        canvas.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+                updateTextPosition(e);
+            }
+        });
+        
+        canvas.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+        
+        function updateTextPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            textX = (e.clientX - rect.left) * scaleX;
+            textY = (e.clientY - rect.top) * scaleY;
+            
+            // 更新滑桿位置
+            textXSlider.value = textX;
+            textYSlider.value = textY;
+            updateRangeValue(textXSlider, document.getElementById('textXValue'));
+            updateRangeValue(textYSlider, document.getElementById('textYValue'));
+            
+            drawCanvas();
+        }
+        
+        function drawCanvas() {
+            // 清除畫布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 繪製漸層背景
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#f5f5dc');  // 米色
+            gradient.addColorStop(0.5, '#e8e8e8'); // 淺灰色
+            gradient.addColorStop(1, '#d3d3d3');   // 灰色
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 繪製文字（支援自動分行）
+            const text = textInput.value || '您的文字';
+            const fontSize = parseInt(fontSizeSlider.value);
+            ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+            ctx.fillStyle = '#333333';  // 深灰色文字，在淺色背景上更清楚
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';  // 白色描邊
+            ctx.lineWidth = 2;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // 分行處理
+            const lines = text.split('\n');
+            const lineHeight = fontSize * 1.2;
+            const totalHeight = lines.length * lineHeight;
+            const startY = textY - totalHeight / 2 + lineHeight / 2;
+            
+            // 繪製每一行文字
+            lines.forEach((line, index) => {
+                const currentY = startY + index * lineHeight;
+                // 文字陰影效果
+                ctx.strokeText(line, textX, currentY);
+                ctx.fillText(line, textX, currentY);
+            });
+            
+            // 繪製上傳的圖片
+            if (uploadedImage) {
+                const imgSize = 300; // 圖片大小
+                const margin = 50;   // 邊距
+                const position = imagePositionSelect.value;
+                
+                let imgX, imgY;
+                
+                // 根據選擇的位置計算座標
+                switch(position) {
+                    case 'bottom-left':
+                        imgX = margin;
+                        imgY = canvas.height - imgSize - margin;
+                        break;
+                    case 'bottom-center':
+                        imgX = (canvas.width - imgSize) / 2;
+                        imgY = canvas.height - imgSize - margin;
+                        break;
+                    case 'bottom-right':
+                    default:
+                        imgX = canvas.width - imgSize - margin;
+                        imgY = canvas.height - imgSize - margin;
+                        break;
+                }
+                
+                // 計算圖片縮放比例以維持比例
+                const scale = Math.min(imgSize / uploadedImage.width, imgSize / uploadedImage.height);
+                const scaledWidth = uploadedImage.width * scale;
+                const scaledHeight = uploadedImage.height * scale;
+                
+                // 居中圖片位置
+                const centeredX = imgX + (imgSize - scaledWidth) / 2;
+                const centeredY = imgY + (imgSize - scaledHeight) / 2;
+                
+                // 繪製圓角遮罩
+                ctx.save();
+                ctx.beginPath();
+                ctx.roundRect(centeredX, centeredY, scaledWidth, scaledHeight, 20);
+                ctx.clip();
+                
+                ctx.drawImage(uploadedImage, centeredX, centeredY, scaledWidth, scaledHeight);
+                ctx.restore();
+            }
+        }
+        
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'ig-cover.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // 初始化
+        drawCanvas();
+    </script>
+</body>
+</html>

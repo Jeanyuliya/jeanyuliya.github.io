@@ -157,6 +157,14 @@
             </div>
             
             <div class="control-group">
+                <label for="colorScheme">選擇配色方案：</label>
+                <select id="colorScheme">
+                    <option value="warm">暖色系（米色橙）</option>
+                    <option value="cool">冷色系（藍綠）</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
                 <label for="imageUpload">上傳圖片：</label>
                 <input type="file" id="imageUpload" accept="image/*">
             </div>
@@ -197,8 +205,8 @@
         
         <div class="preview-container">
             <div class="canvas-container">
-                <div class="size-info">尺寸: 1080 x 1080 (IG正方形)</div>
-                <canvas id="canvas" width="1080" height="1080"></canvas>
+                <div class="size-info">尺寸: 1080 x 1350 (IG 4:5直式)</div>
+                <canvas id="canvas" width="1080" height="1350"></canvas>
             </div>
         </div>
     </div>
@@ -212,11 +220,12 @@
         const textYSlider = document.getElementById('textY');
         const fontSizeSlider = document.getElementById('fontSize');
         const imagePositionSelect = document.getElementById('imagePosition');
+        const colorSchemeSelect = document.getElementById('colorScheme');
         
         let uploadedImage = null;
         let isDragging = false;
         let textX = 540;
-        let textY = 540;
+        let textY = 675;  // 調整為新高度的中心
         
         // 更新範圍值顯示
         function updateRangeValue(slider, valueElement) {
@@ -263,6 +272,9 @@
         // 圖片位置選擇處理
         imagePositionSelect.addEventListener('change', drawCanvas);
         
+        // 配色方案選擇處理
+        colorSchemeSelect.addEventListener('change', drawCanvas);
+        
         // 滑鼠拖拽文字位置
         canvas.addEventListener('mousedown', function(e) {
             isDragging = true;
@@ -300,11 +312,21 @@
             // 清除畫布
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 繪製漸層背景
+            // 繪製漸層背景（根據選擇的配色方案）
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, '#F7F2ED');  // 您指定的米色
-            gradient.addColorStop(0.5, '#FAEEE0'); // 中間過渡色
-            gradient.addColorStop(1, '#FFDDB6');   // 最終的橙米色
+            const colorScheme = colorSchemeSelect.value;
+            
+            if (colorScheme === 'warm') {
+                // 暖色系：米色到橙色
+                gradient.addColorStop(0, '#F7F2ED');
+                gradient.addColorStop(0.5, '#FAEEE0');
+                gradient.addColorStop(1, '#FFDDB6');
+            } else {
+                // 冷色系：藍綠色
+                gradient.addColorStop(0, '#d8f0f2');
+                gradient.addColorStop(0.5, '#d8f1e6');
+                gradient.addColorStop(1, '#d8f2da');
+            }
             
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);

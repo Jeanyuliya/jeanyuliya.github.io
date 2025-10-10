@@ -378,7 +378,11 @@
                 try {
                     let text = e.target.result;
                     
-                    // 修復 Facebook 的各種 Unicode 編碼
+                    // 第一步：修復 Facebook 的反斜線問題
+                    // 將錯誤的反斜線跳脫修正
+                    text = fixBackslashes(text);
+                    
+                    // 第二步：修復 Facebook 的各種 Unicode 編碼
                     text = decodeUnicodeEscapes(text);
                     
                     jsonData = JSON.parse(text);
@@ -387,14 +391,67 @@
                     convertBtn.disabled = false;
                     updateInstructions();
                 } catch (error) {
-                    showStatus('❌ JSON 格式錯誤: ' + error.message, 'error');
-                    console.error(error);
+                    showStatus('❌ JSON 格式錯誤: ' + error.message + ' - 嘗試使用寬鬆模式解析...', 'warning');
+                    
+                    // 嘗試更激進的修復
+                    try {
+                        text = e.target.result;
+                        text = aggressiveFixJSON(text);
+                        jsonData = JSON.parse(text);
+                        showStatus(`✅ 成功載入（寬鬆模式）！檔案大小: ${(file.size / 1024 / 1024).toFixed(2)} MB，共 ${countRecords(jsonData)} 筆資料`, 'success');
+                        options.style.display = 'block';
+                        convertBtn.disabled = false;
+                        updateInstructions();
+                    } catch (error2) {
+                        showStatus('❌ JSON 格式錯誤，無法解析: ' + error2.message, 'error');
+                        console.error('原始錯誤:', error);
+                        console.error('寬鬆模式錯誤:', error2);
+                    }
                 }
             };
             reader.onerror = () => {
                 showStatus('❌ 檔案讀取失敗', 'error');
             };
             reader.readAsText(file, 'UTF-8');
+        }
+
+        function fixBackslashes(text) {
+            // FB JSON 中常見的問題：地址等文字中的反斜線沒有正確跳脫
+            // 在 JSON 字串值內，單個反斜線應該是 \\
+            
+            // 這個正則會找出字串值中的反斜線，並確保它們被正確跳脫
+            // 但要避免已經正確跳脫的情況（如 \\ \" \n \t \u）
+            
+            return text.replace(/"([^"]*?)"/g, (match, content) => {
+                // 修復字串內容中的反斜線
+                let fixed = content.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+                return '"' + fixed + '"';
+            });
+        }
+
+        function aggressiveFixJSON(text) {
+            // 更激進的 JSON 修復策略
+            
+            // 1. 修復反斜線
+            text = text.replace(/"([^"]*?)"/g, (match, content) => {
+                let fixed = content
+                    .replace(/\\/g, '\\\\')  // 先全部跳脫
+                    .replace(/\\\\\\\\/g, '\\\\')  // 修正過度跳脫
+                    .replace(/\\\\"/g, '\\"')  // 修正引號
+                    .replace(/\\\\n/g, '\\n')  // 修正換行
+                    .replace(/\\\\t/g, '\\t')  // 修正tab
+                    .replace(/\\\\r/g, '\\r')  // 修正回車
+                    .replace(/\\\\u/g, '\\u'); // 修正unicode
+                return '"' + fixed + '"';
+            });
+            
+            // 2. 移除 BOM
+            text = text.replace(/^\uFEFF/, '');
+            
+            // 3. 修復 Unicode 編碼
+            text = decodeUnicodeEscapes(text);
+            
+            return text;
         }
 
         function decodeUnicodeEscapes(text) {

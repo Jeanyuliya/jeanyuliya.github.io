@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FB JSON 轉 CSV 工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area:hover {
+            background: #f0f2ff;
+            border-color: #764ba2;
+        }
+        
+        .upload-area.dragover {
+            background: #e8ebff;
+            border-color: #5a67d8;
+        }
+        
+        .upload-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .preview {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            background: #f9f9f9;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            display: none;
+        }
+        
+        .options {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+        }
+        
+        .option-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        
+        .field-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .checkbox-label:hover {
+            background: #e8ebff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 FB JSON 轉 CSV 工具</h1>
+        <p class="subtitle">支援大型檔案（10MB+）・離線處理・正確編碼</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📤</div>
+            <h3>拖放 JSON 檔案到這裡</h3>
+            <p>或點擊選擇檔案</p>
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+        
+        <div class="options" id="options" style="display:none;">
+            <div class="option-group">
+                <label>
+                    <input type="checkbox" id="includeTimestamp" checked>
+                    包含時間戳記
+                </label>
+                <label>
+                    <input type="checkbox" id="flattenData" checked>
+                    展開巢狀資料（建議）
+                </label>
+            </div>
+            
+            <div class="option-group">
+                <label>選擇要匯出的欄位：</label>
+                <div class="field-selector" id="fieldSelector"></div>
+            </div>
+            
+            <button class="btn" id="convertBtn" disabled>🔄 轉換為 CSV</button>
+            <button class="btn" id="downloadBtn" style="display:none;">💾 下載 CSV</button>
+        </div>
+        
+        <div class="status" id="status"></div>
+        <div class="preview" id="preview"></div>
+    </div>
+
+    <script>
+        let jsonData = null;
+        let csvContent = null;
+        let availableFields = new Set();
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        const preview = document.getElementById('preview');
+        const options = document.getElementById('options');
+        const convertBtn = document.getElementById('convertBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const fieldSelector = document.getElementById('fieldSelector');
+
+        // 拖放功能
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+
+        function handleFile(file) {
+            showStatus('讀取檔案中...', 'info');
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let text = e.target.result;
+                    
+                    // 修復 Facebook 的 Unicode 編碼問題
+                    text = text.replace(/\\u00([0-9a-f]{2})/gi, (match, hex) => {
+                        return String.fromCharCode(parseInt(hex, 16));
+                    });
+                    
+                    jsonData = JSON.parse(text);
+                    analyzeJSON(jsonData);
+                    showStatus(`✅ 成功載入！檔案大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+                    options.style.display = 'block';
+                    convertBtn.disabled = false;
+                } catch (error) {
+                    showStatus('❌ JSON 格式錯誤: ' + error.message, 'error');
+                    console.error(error);
+                }
+            };
+            reader.onerror = () => {
+                showStatus('❌ 檔案讀取失敗', 'error');
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function analyzeJSON(data) {
+            availableFields.clear();
+            
+            // 分析 JSON 結構，找出所有可能的欄位
+            function extractFields(obj, prefix = '') {
+                if (Array.isArray(obj)) {
+                    obj.forEach(item => extractFields(item, prefix));
+                } else if (obj && typeof obj === 'object') {
+                    Object.keys(obj).forEach(key => {
+                        const fullKey = prefix ? `${prefix}.${key}` : key;
+                        availableFields.add(fullKey);
+                        if (typeof obj[key] === 'object' && obj[key] !== null) {
+                            extractFields(obj[key], fullKey);
+                        }
+                    });
+                }
+            }
+            
+            extractFields(data);
+            renderFieldSelector();
+        }
+
+        function renderFieldSelector() {
+            fieldSelector.innerHTML = '';
+            const commonFields = ['timestamp', 'title', 'data', 'text', 'post', 'attachments'];
+            
+            // 先顯示常見欄位
+            availableFields.forEach(field => {
+                if (commonFields.some(cf => field.includes(cf))) {
+                    addFieldCheckbox(field, true);
+                }
+            });
+            
+            // 再顯示其他欄位
+            availableFields.forEach(field => {
+                if (!commonFields.some(cf => field.includes(cf))) {
+                    addFieldCheckbox(field, false);
+                }
+            });
+        }
+
+        function addFieldCheckbox(field, checked) {
+            const div = document.createElement('div');
+            div.className = 'checkbox-label';
+            div.innerHTML = `
+                <input type="checkbox" id="field_${field.replace(/\./g, '_')}" ${checked ? 'checked' : ''} value="${field}">
+                <label for="field_${field.replace(/\./g, '_')}" style="margin:0;cursor:pointer;">${field}</label>
+            `;
+            fieldSelector.appendChild(div);
+        }
+
+        convertBtn.addEventListener('click', convertToCSV);
+
+        function convertToCSV() {
+            showStatus('轉換中...', 'info');
+            
+            try {
+                const includeTimestamp = document.getElementById('includeTimestamp').checked;
+                const flattenData = document.getElementById('flattenData').checked;
+                
+                // 取得選中的欄位
+                const selectedFields = Array.from(document.querySelectorAll('#fieldSelector input:checked'))
+                    .map(cb => cb.value);
+                
+                if (selectedFields.length === 0) {
+                    showStatus('❌ 請至少選擇一個欄位', 'error');
+                    return;
+                }
+                
+                let rows = [];
+                
+                // 處理 FB 貼文資料結構
+                function processData(data) {
+                    if (Array.isArray(data)) {
+                        return data.map(item => flattenObject(item));
+                    } else if (data && typeof data === 'object') {
+                        // 檢查是否有常見的 FB 資料結構
+                        if (data.posts) return processData(data.posts);
+                        if (data.data) return processData(data.data);
+                        return [flattenObject(data)];
+                    }
+                    return [];
+                }
+                
+                function flattenObject(obj, prefix = '') {
+                    let result = {};
+                    
+                    for (let key in obj) {
+                        const fullKey = prefix ? `${prefix}.${key}` : key;
+                        
+                        if (!selectedFields.includes(fullKey) && !selectedFields.some(f => fullKey.startsWith(f + '.'))) {
+                            continue;
+                        }
+                        
+                        if (obj[key] === null || obj[key] === undefined) {
+                            result[fullKey] = '';
+                        } else if (Array.isArray(obj[key])) {
+                            result[fullKey] = flattenData ? JSON.stringify(obj[key]) : obj[key].join('; ');
+                        } else if (typeof obj[key] === 'object') {
+                            if (flattenData) {
+                                Object.assign(result, flattenObject(obj[key], fullKey));
+                            } else {
+                                result[fullKey] = JSON.stringify(obj[key]);
+                            }
+                        } else {
+                            result[fullKey] = obj[key];
+                        }
+                    }
+                    
+                    return result;
+                }
+                
+                rows = processData(jsonData);
+                
+                if (rows.length === 0) {
+                    showStatus('❌ 沒有找到可轉換的資料', 'error');
+                    return;
+                }
+                
+                // 產生 CSV
+                const allKeys = [...new Set(rows.flatMap(row => Object.keys(row)))];
+                const headers = allKeys.filter(key => selectedFields.some(f => key === f || key.startsWith(f + '.')));
+                
+                csvContent = [
+                    headers.map(escapeCSV).join(','),
+                    ...rows.map(row => 
+                        headers.map(header => escapeCSV(row[header] || '')).join(',')
+                    )
+                ].join('\n');
+                
+                // 加上 UTF-8 BOM
+                csvContent = '\ufeff' + csvContent;
+                
+                showStatus(`✅ 轉換成功！共 ${rows.length} 筆資料`, 'success');
+                
+                // 顯示預覽
+                const previewLines = csvContent.split('\n').slice(0, 6).join('\n');
+                preview.textContent = previewLines + '\n...（僅顯示前 5 行）';
+                preview.style.display = 'block';
+                
+                downloadBtn.style.display = 'inline-block';
+            } catch (error) {
+                showStatus('❌ 轉換失敗: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        function escapeCSV(value) {
+            if (value === null || value === undefined) return '';
+            const str = String(value);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'fb_posts_' + new Date().toISOString().slice(0,10) + '.csv';
+            link.click();
+            showStatus('✅ 下載開始！', 'success');
+        });
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

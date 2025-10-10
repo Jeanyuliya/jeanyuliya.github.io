@@ -12,7 +12,7 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -26,7 +26,7 @@
             border-radius: 20px;
             padding: 40px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 800px;
+            max-width: 900px;
             width: 100%;
         }
         
@@ -95,6 +95,10 @@
             transform: none;
         }
         
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        }
+        
         .status {
             margin-top: 20px;
             padding: 15px;
@@ -120,17 +124,24 @@
             border: 1px solid #bee5eb;
         }
         
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
         .preview {
             margin-top: 20px;
-            max-height: 300px;
+            max-height: 200px;
             overflow: auto;
             border: 1px solid #ddd;
             border-radius: 10px;
             padding: 15px;
             background: #f9f9f9;
-            font-size: 12px;
-            font-family: 'Courier New', monospace;
+            font-size: 13px;
             display: none;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
         
         .options {
@@ -142,44 +153,94 @@
         
         .option-group {
             margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .option-group:last-child {
+            border-bottom: none;
         }
         
         label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             color: #333;
             font-weight: 500;
         }
         
-        input[type="checkbox"] {
+        input[type="checkbox"], input[type="radio"] {
             margin-right: 8px;
         }
         
-        .field-selector {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
+        .encoding-options {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
             margin-top: 10px;
         }
         
-        .checkbox-label {
+        .radio-label {
             display: flex;
             align-items: center;
-            padding: 8px;
+            padding: 10px 15px;
             background: white;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
+            border: 2px solid transparent;
         }
         
-        .checkbox-label:hover {
+        .radio-label:hover {
             background: #e8ebff;
+        }
+        
+        .radio-label input:checked + span {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            font-weight: normal;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .info-box {
+            background: #e8f4fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .info-box h3 {
+            margin-bottom: 10px;
+            color: #1976D2;
+            font-size: 16px;
+        }
+        
+        .info-box ul {
+            margin-left: 20px;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .info-box li {
+            margin-bottom: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📱 FB JSON 轉 CSV 工具</h1>
-        <p class="subtitle">支援大型檔案（10MB+）・離線處理・正確編碼</p>
+        <p class="subtitle">支援大型檔案・完全離線・修正 Excel 亂碼問題</p>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📤</div>
@@ -190,33 +251,56 @@
         
         <div class="options" id="options" style="display:none;">
             <div class="option-group">
-                <label>
-                    <input type="checkbox" id="includeTimestamp" checked>
-                    包含時間戳記
-                </label>
-                <label>
-                    <input type="checkbox" id="flattenData" checked>
-                    展開巢狀資料（建議）
-                </label>
+                <label>📝 選擇編碼格式（重要！）</label>
+                <div class="help-text">⚠️ Excel LTSC 2021 建議使用「Big5 (繁體中文)」</div>
+                <div class="encoding-options">
+                    <label class="radio-label">
+                        <input type="radio" name="encoding" value="big5" checked>
+                        <span>Big5 (繁體中文) - 推薦 Excel 使用</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="encoding" value="utf8bom">
+                        <span>UTF-8 with BOM</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="encoding" value="utf16">
+                        <span>UTF-16 (Unicode)</span>
+                    </label>
+                </div>
             </div>
             
             <div class="option-group">
-                <label>選擇要匯出的欄位：</label>
-                <div class="field-selector" id="fieldSelector"></div>
+                <label>⚙️ 資料處理選項</label>
+                <label style="font-weight: normal;">
+                    <input type="checkbox" id="includeTimestamp" checked>
+                    包含時間戳記
+                </label>
+                <label style="font-weight: normal;">
+                    <input type="checkbox" id="simplifyOutput" checked>
+                    簡化輸出（僅保留主要內容，建議開啟）
+                </label>
             </div>
             
-            <button class="btn" id="convertBtn" disabled>🔄 轉換為 CSV</button>
-            <button class="btn" id="downloadBtn" style="display:none;">💾 下載 CSV</button>
+            <div class="button-group">
+                <button class="btn" id="convertBtn" disabled>🔄 轉換為 CSV</button>
+                <button class="btn btn-success" id="downloadBtn" style="display:none;">💾 下載 CSV</button>
+            </div>
+        </div>
+        
+        <div class="info-box" style="display:none;" id="infoBox">
+            <h3>💡 如何在 Excel 中正確開啟？</h3>
+            <ul id="openInstructions"></ul>
         </div>
         
         <div class="status" id="status"></div>
         <div class="preview" id="preview"></div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.0.0/encoding.min.js"></script>
     <script>
         let jsonData = null;
         let csvContent = null;
-        let availableFields = new Set();
+        let selectedEncoding = 'big5';
 
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
@@ -225,7 +309,42 @@
         const options = document.getElementById('options');
         const convertBtn = document.getElementById('convertBtn');
         const downloadBtn = document.getElementById('downloadBtn');
-        const fieldSelector = document.getElementById('fieldSelector');
+        const infoBox = document.getElementById('infoBox');
+        const openInstructions = document.getElementById('openInstructions');
+
+        // 監聽編碼選擇
+        document.querySelectorAll('input[name="encoding"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                selectedEncoding = e.target.value;
+                updateInstructions();
+            });
+        });
+
+        function updateInstructions() {
+            let instructions = [];
+            if (selectedEncoding === 'big5') {
+                instructions = [
+                    '直接雙擊 CSV 檔案即可用 Excel 開啟',
+                    '中文應該會正確顯示',
+                    '如果還是亂碼，請選擇 UTF-16 編碼重新轉換'
+                ];
+            } else if (selectedEncoding === 'utf16') {
+                instructions = [
+                    '開啟 Excel → 資料 → 取得資料 → 從文字/CSV',
+                    '選擇下載的 CSV 檔案',
+                    '在「檔案原始格式」選擇「Unicode (UTF-16)」',
+                    '點擊「載入」'
+                ];
+            } else {
+                instructions = [
+                    '嘗試直接雙擊開啟',
+                    '如果亂碼，請選擇 Big5 編碼重新轉換'
+                ];
+            }
+            
+            openInstructions.innerHTML = instructions.map(i => `<li>${i}</li>`).join('');
+            infoBox.style.display = 'block';
+        }
 
         // 拖放功能
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -259,16 +378,14 @@
                 try {
                     let text = e.target.result;
                     
-                    // 修復 Facebook 的 Unicode 編碼問題
-                    text = text.replace(/\\u00([0-9a-f]{2})/gi, (match, hex) => {
-                        return String.fromCharCode(parseInt(hex, 16));
-                    });
+                    // 修復 Facebook 的各種 Unicode 編碼
+                    text = decodeUnicodeEscapes(text);
                     
                     jsonData = JSON.parse(text);
-                    analyzeJSON(jsonData);
-                    showStatus(`✅ 成功載入！檔案大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+                    showStatus(`✅ 成功載入！檔案大小: ${(file.size / 1024 / 1024).toFixed(2)} MB，共 ${countRecords(jsonData)} 筆資料`, 'success');
                     options.style.display = 'block';
                     convertBtn.disabled = false;
+                    updateInstructions();
                 } catch (error) {
                     showStatus('❌ JSON 格式錯誤: ' + error.message, 'error');
                     console.error(error);
@@ -280,55 +397,28 @@
             reader.readAsText(file, 'UTF-8');
         }
 
-        function analyzeJSON(data) {
-            availableFields.clear();
+        function decodeUnicodeEscapes(text) {
+            // 處理 \u00xx 格式
+            text = text.replace(/\\u00([0-9a-f]{2})/gi, (match, hex) => {
+                return String.fromCharCode(parseInt(hex, 16));
+            });
             
-            // 分析 JSON 結構，找出所有可能的欄位
-            function extractFields(obj, prefix = '') {
-                if (Array.isArray(obj)) {
-                    obj.forEach(item => extractFields(item, prefix));
-                } else if (obj && typeof obj === 'object') {
-                    Object.keys(obj).forEach(key => {
-                        const fullKey = prefix ? `${prefix}.${key}` : key;
-                        availableFields.add(fullKey);
-                        if (typeof obj[key] === 'object' && obj[key] !== null) {
-                            extractFields(obj[key], fullKey);
-                        }
-                    });
-                }
+            // 處理完整的 \uxxxx 格式
+            text = text.replace(/\\u([0-9a-f]{4})/gi, (match, hex) => {
+                return String.fromCharCode(parseInt(hex, 16));
+            });
+            
+            return text;
+        }
+
+        function countRecords(data) {
+            if (Array.isArray(data)) return data.length;
+            if (data && typeof data === 'object') {
+                if (data.posts) return countRecords(data.posts);
+                if (data.data) return countRecords(data.data);
+                return 1;
             }
-            
-            extractFields(data);
-            renderFieldSelector();
-        }
-
-        function renderFieldSelector() {
-            fieldSelector.innerHTML = '';
-            const commonFields = ['timestamp', 'title', 'data', 'text', 'post', 'attachments'];
-            
-            // 先顯示常見欄位
-            availableFields.forEach(field => {
-                if (commonFields.some(cf => field.includes(cf))) {
-                    addFieldCheckbox(field, true);
-                }
-            });
-            
-            // 再顯示其他欄位
-            availableFields.forEach(field => {
-                if (!commonFields.some(cf => field.includes(cf))) {
-                    addFieldCheckbox(field, false);
-                }
-            });
-        }
-
-        function addFieldCheckbox(field, checked) {
-            const div = document.createElement('div');
-            div.className = 'checkbox-label';
-            div.innerHTML = `
-                <input type="checkbox" id="field_${field.replace(/\./g, '_')}" ${checked ? 'checked' : ''} value="${field}">
-                <label for="field_${field.replace(/\./g, '_')}" style="margin:0;cursor:pointer;">${field}</label>
-            `;
-            fieldSelector.appendChild(div);
+            return 0;
         }
 
         convertBtn.addEventListener('click', convertToCSV);
@@ -338,58 +428,97 @@
             
             try {
                 const includeTimestamp = document.getElementById('includeTimestamp').checked;
-                const flattenData = document.getElementById('flattenData').checked;
-                
-                // 取得選中的欄位
-                const selectedFields = Array.from(document.querySelectorAll('#fieldSelector input:checked'))
-                    .map(cb => cb.value);
-                
-                if (selectedFields.length === 0) {
-                    showStatus('❌ 請至少選擇一個欄位', 'error');
-                    return;
-                }
+                const simplifyOutput = document.getElementById('simplifyOutput').checked;
                 
                 let rows = [];
                 
-                // 處理 FB 貼文資料結構
+                // 處理 FB 貼文資料
                 function processData(data) {
                     if (Array.isArray(data)) {
-                        return data.map(item => flattenObject(item));
+                        return data.map(item => extractMainData(item));
                     } else if (data && typeof data === 'object') {
-                        // 檢查是否有常見的 FB 資料結構
                         if (data.posts) return processData(data.posts);
                         if (data.data) return processData(data.data);
-                        return [flattenObject(data)];
+                        return [extractMainData(data)];
                     }
                     return [];
                 }
                 
-                function flattenObject(obj, prefix = '') {
+                function extractMainData(item) {
                     let result = {};
                     
-                    for (let key in obj) {
-                        const fullKey = prefix ? `${prefix}.${key}` : key;
-                        
-                        if (!selectedFields.includes(fullKey) && !selectedFields.some(f => fullKey.startsWith(f + '.'))) {
-                            continue;
-                        }
-                        
-                        if (obj[key] === null || obj[key] === undefined) {
-                            result[fullKey] = '';
-                        } else if (Array.isArray(obj[key])) {
-                            result[fullKey] = flattenData ? JSON.stringify(obj[key]) : obj[key].join('; ');
-                        } else if (typeof obj[key] === 'object') {
-                            if (flattenData) {
-                                Object.assign(result, flattenObject(obj[key], fullKey));
-                            } else {
-                                result[fullKey] = JSON.stringify(obj[key]);
+                    // 時間戳記
+                    if (includeTimestamp && item.timestamp) {
+                        result['時間'] = new Date(item.timestamp * 1000).toLocaleString('zh-TW');
+                    }
+                    
+                    // 標題
+                    if (item.title) {
+                        result['標題'] = cleanText(item.title);
+                    }
+                    
+                    // 貼文內容 - 多層檢查
+                    let postContent = '';
+                    if (item.data) {
+                        if (Array.isArray(item.data)) {
+                            for (let d of item.data) {
+                                if (d.post) postContent = d.post;
+                                else if (d.text) postContent = d.text;
+                                if (postContent) break;
                             }
-                        } else {
-                            result[fullKey] = obj[key];
+                        } else if (typeof item.data === 'object') {
+                            postContent = item.data.post || item.data.text || '';
+                        }
+                    }
+                    
+                    if (!postContent && item.post) postContent = item.post;
+                    if (!postContent && item.text) postContent = item.text;
+                    
+                    if (postContent) {
+                        result['內容'] = cleanText(postContent);
+                    }
+                    
+                    // 附件連結
+                    if (item.attachments) {
+                        let links = extractLinks(item.attachments);
+                        if (links) result['連結'] = links;
+                    }
+                    
+                    // 如果不簡化，加入原始資料
+                    if (!simplifyOutput) {
+                        if (item.data) {
+                            result['原始資料'] = JSON.stringify(item.data);
                         }
                     }
                     
                     return result;
+                }
+                
+                function cleanText(text) {
+                    if (!text) return '';
+                    text = String(text);
+                    text = decodeUnicodeEscapes(text);
+                    // 移除多餘空白
+                    text = text.replace(/\s+/g, ' ').trim();
+                    return text;
+                }
+                
+                function extractLinks(attachments) {
+                    if (!attachments) return '';
+                    let links = [];
+                    
+                    function findUrls(obj) {
+                        if (Array.isArray(obj)) {
+                            obj.forEach(item => findUrls(item));
+                        } else if (obj && typeof obj === 'object') {
+                            if (obj.url) links.push(obj.url);
+                            if (obj.uri) links.push(obj.uri);
+                            Object.values(obj).forEach(val => findUrls(val));
+                        }
+                    }
+                    
+                    findUrls(attachments);
+                    return links.filter(l => l && l !== '').join('; ');
                 }
                 
                 rows = processData(jsonData);
@@ -400,9 +529,7 @@
                 }
                 
                 // 產生 CSV
-                const allKeys = [...new Set(rows.flatMap(row => Object.keys(row)))];
-                const headers = allKeys.filter(key => selectedFields.some(f => key === f || key.startsWith(f + '.')));
-                
+                const headers = Object.keys(rows[0]);
                 csvContent = [
                     headers.map(escapeCSV).join(','),
                     ...rows.map(row => 
@@ -410,14 +537,11 @@
                     )
                 ].join('\n');
                 
-                // 加上 UTF-8 BOM
-                csvContent = '\ufeff' + csvContent;
-                
                 showStatus(`✅ 轉換成功！共 ${rows.length} 筆資料`, 'success');
                 
-                // 顯示預覽
-                const previewLines = csvContent.split('\n').slice(0, 6).join('\n');
-                preview.textContent = previewLines + '\n...（僅顯示前 5 行）';
+                // 顯示預覽（前3行）
+                const previewLines = csvContent.split('\n').slice(0, 4).join('\n');
+                preview.textContent = previewLines + '\n...(僅顯示前 3 筆)';
                 preview.style.display = 'block';
                 
                 downloadBtn.style.display = 'inline-block';
@@ -437,12 +561,40 @@
         }
 
         downloadBtn.addEventListener('click', () => {
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            let blob;
+            let filename = 'fb_posts_' + new Date().toISOString().slice(0,10);
+            
+            if (selectedEncoding === 'big5') {
+                // 使用 encoding.js 轉換為 Big5
+                const sjisArray = Encoding.convert(Encoding.stringToCode(csvContent), {
+                    to: 'SJIS',
+                    from: 'UNICODE'
+                });
+                const uint8Array = new Uint8Array(sjisArray);
+                blob = new Blob([uint8Array], { type: 'text/csv;charset=big5' });
+                filename += '_big5.csv';
+            } else if (selectedEncoding === 'utf16') {
+                // UTF-16 LE with BOM
+                const utf16Content = '\ufeff' + csvContent;
+                const utf16Array = new Uint16Array(utf16Content.length);
+                for (let i = 0; i < utf16Content.length; i++) {
+                    utf16Array[i] = utf16Content.charCodeAt(i);
+                }
+                blob = new Blob([utf16Array], { type: 'text/csv;charset=utf-16le' });
+                filename += '_utf16.csv';
+            } else {
+                // UTF-8 with BOM
+                const utf8Content = '\ufeff' + csvContent;
+                blob = new Blob([utf8Content], { type: 'text/csv;charset=utf-8' });
+                filename += '_utf8.csv';
+            }
+            
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'fb_posts_' + new Date().toISOString().slice(0,10) + '.csv';
+            link.download = filename;
             link.click();
-            showStatus('✅ 下載開始！', 'success');
+            
+            showStatus('✅ 下載完成！請用 Excel 開啟檔案', 'success');
         });
 
         function showStatus(message, type) {

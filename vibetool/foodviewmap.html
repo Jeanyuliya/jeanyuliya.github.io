@@ -142,11 +142,12 @@ function initMap() {
 }
 
 /**********************
- *  從 GAS 載入資料
+ *  從 GAS 載入資料（同時統計全數，但地圖只畫未拜訪）
  **********************/
 async function loadStoreData() {
   const btn = document.getElementById('loadData');
-  btn.disabled = true; btn.textContent = '載入中…';
+  btn.disabled = true;
+  btn.textContent = '載入中…';
   showMessage('從 Google Sheets 載入資料中…', 'info');
 
   try {
@@ -154,8 +155,8 @@ async function loadStoreData() {
     const json = await res.json();
     if (!json.success) throw new Error(json.message || '資料載入失敗');
 
-    // 中文欄位對應轉換
-    storeData = json.data.map(s => ({
+    // ✅ 全部資料
+    const allData = (json.data || []).map(s => ({
       rowIndex: s.rowIndex,
       name: s['餐廳或景點'] || s.name || '未命名',
       category: s['類別'] || '',
@@ -164,24 +165,33 @@ async function loadStoreData() {
       description: s['備註'] || '',
       lat: parseFloat(s['緯度'] || s.lat || 0),
       lng: parseFloat(s['經度'] || s.lng || 0),
-      completed: ['是','true','1'].includes(String(s['完成']).toLowerCase())
+      completed: ['是', 'true', '1', '✓', 'checked'].includes(String(s['完成']).toLowerCase())
     }));
 
+    // ✅ 統計所有資料
+    const visited = allData.filter(s => s.completed).length;
+    const total = allData.length;
+    const unvisited = total - visited;
+
+    // ✅ 地圖只顯示「未拜訪」的店家
+    storeData = allData.filter(s => !s.completed);
     createMarkers();
 
-    // 統計數據
-    document.getElementById('totalStores').textContent = storeData.length;
-    const visited = storeData.filter(s => s.completed).length;
+    // ✅ 更新 UI 統計數字（全部統計）
+    document.getElementById('totalStores').textContent = total;
     document.getElementById('visitedTotal').textContent = visited;
-    document.getElementById('activeMarkers').textContent = storeData.length - visited;
+    document.getElementById('activeMarkers').textContent = unvisited;
 
-    showMessage(`成功載入 ${storeData.length} 筆資料`, 'success');
+    showMessage(`成功載入 ${total} 筆資料（未拜訪 ${unvisited} 筆）`, 'success');
+
   } catch (e) {
     showMessage(`資料載入失敗：${e.message}`, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = '📥 載入店家資料';
+    btn.disabled = false;
+    btn.textContent = '📥 載入店家資料';
   }
 }
+
 
 /**********************
  *  產生標記與資訊窗

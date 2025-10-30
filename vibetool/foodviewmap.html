@@ -1,73 +1,152 @@
-<!doctype html>
-<html lang="zh-Hant">
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>店家景點地圖追蹤器</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店家追蹤地圖</title>
   <style>
-    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","PingFang TC","Microsoft JhengHei","Heiti TC",sans-serif;margin:0;background:#f7f9fc;color:#2c3e50}
-    .header{padding:28px 20px 16px;text-align:center;background:linear-gradient(135deg,#6a8dff,#7be8cc);color:#fff}
-    .container{max-width:1100px;margin:18px auto;padding:0 16px}
-    .controls{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
-    #loadData{background:linear-gradient(135deg,#6a8dff,#67d6ff);border:none;color:#fff;font-weight:600;padding:12px 18px;border-radius:10px;cursor:pointer;font-size:16px}
-    #loadData:disabled{opacity:.6;cursor:not-allowed}
-    .map-container{height:60vh;border-radius:12px;overflow:hidden;background:#eef1f7;box-shadow:0 8px 22px rgba(0,0,0,.06)}
-    #map{height:100%;position:relative}
-    .loading{display:flex;align-items:center;justify-content:center;height:100%;color:#777}
-    .status{margin-top:16px;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 22px rgba(0,0,0,.06)}
-    .status h3{margin:0 0 8px 0}
-    .status-item{display:flex;justify-content:space-between;margin:6px 0;padding:8px 10px;border-radius:8px;background:#f6f8ff}
-    #messages .info{background:#eef5ff;border-left:4px solid #3b82f6;margin-top:8px;padding:8px;border-radius:8px}
-    #messages .success{background:#edfff5;border-left:4px solid #22c55e;margin-top:8px;padding:8px;border-radius:8px}
-    #messages .error{background:#fff2f2;border-left:4px solid #ef4444;margin-top:8px;padding:8px;border-radius:8px}
-    .info-window{max-width:280px}
-    .info-window h3{margin:0 0 6px}
-    .remove-btn{margin-top:8px;background:#22c55e;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
-    input#addressSearch{flex:1;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px}
-    .btn-search{background:linear-gradient(135deg,#28a745 0%,#20c997 100%);color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer}
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: #f5f5f5; }
+    #map { height: 70vh; width: 100%; }
+    .controls {
+      background: white;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.3s;
+    }
+    button:hover { background: #45a049; transform: translateY(-2px); }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    #addressSearch {
+      flex: 1;
+      min-width: 200px;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .stats {
+      background: white;
+      padding: 15px 20px;
+      display: flex;
+      gap: 30px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+    #messages {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 400px;
+    }
+    #messages > div {
+      padding: 15px 20px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .success { background: #4CAF50; color: white; }
+    .error { background: #f44336; color: white; }
+    .info { background: #2196F3; color: white; }
+    .info-window {
+      max-width: 300px;
+      padding: 10px;
+    }
+    .info-window h3 {
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .info-window p {
+      margin: 5px 0;
+      color: #666;
+      font-size: 14px;
+    }
+    .remove-btn {
+      width: 100%;
+      margin-top: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .remove-btn:hover { background: #45a049; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>🗺️ 店家景點地圖追蹤器</h1>
-    <p>載入您的店家資料，追蹤拜訪進度</p>
-  </div>
-
-  <div class="container">
-    <div class="controls">
-      <button id="loadData" onclick="loadStoreData()">📥 載入店家資料</button>
-      <div style="display:flex;gap:10px;align-items:center">
-        <input id="addressSearch" placeholder="輸入地址或區域名稱…" />
-        <button class="btn-search" onclick="searchAndMoveMap()">🔍 搜尋位置</button>
-      </div>
+  <div class="stats">
+    <div class="stat-item">
+      <div class="stat-value" id="totalStores">0</div>
+      <div class="stat-label">總店家數</div>
     </div>
-
-    <div class="map-container">
-      <div id="map"><div class="loading"><p>📍 正在初始化地圖…</p></div></div>
+    <div class="stat-item">
+      <div class="stat-value" id="visitedTotal">0</div>
+      <div class="stat-label">已拜訪</div>
     </div>
-
-    <div class="status">
-      <h3>📊 狀態資訊</h3>
-      <div class="status-item"><span>總店家數量:</span><span id="totalStores">0</span></div>
-      <div class="status-item"><span>待拜訪標記:</span><span id="activeMarkers">0</span></div>
-      <div class="status-item"><span>已拜訪店家:</span><span id="visitedTotal">0</span></div>
-      <div id="messages"></div>
+    <div class="stat-item">
+      <div class="stat-value" id="activeMarkers">0</div>
+      <div class="stat-label">待拜訪</div>
     </div>
   </div>
+
+  <div class="controls">
+    <button id="loadData" onclick="loadStoreData()">📥 載入店家資料</button>
+    <input type="text" id="addressSearch" placeholder="輸入地址或區域名稱（例：台北、大安區）">
+    <button onclick="searchAndMoveMap()">🔍 搜尋位置</button>
+  </div>
+
+  <div id="map"></div>
+  <div id="messages"></div>
 
   <script>
     /**********************
      *  可調參數區
      **********************/
 
-    // ✅ 你的 Apps Script Web App（不要帶任何 query）
-    const BASE_API_URL =
-      'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
+    // ✅ 你的 Apps Script Web App URL
+    const BASE_API_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
 
-    // ✅ Google Maps Key（可留空；若有就會加 key=）
-    const GOOGLE_MAPS_KEY = ''; // 例：'AIzaSy...'
+    // ✅ 寫入操作的 Token (與 GAS Script Property 中的 SHEET_WRITE_TOKEN 一致)
+    const SHEET_WRITE_TOKEN = 'YOUR_TOKEN_HERE'; // ⚠️ 請替換成你的實際 token
 
-    // ✅ 地圖只畫未拜訪（仍會再抓一次全部做統計）
+    // ✅ Google Maps Key（可留空）
+    const GOOGLE_MAPS_KEY = '';
+
+    // ✅ 地圖只畫未拜訪
     const DRAW_ONLY_UNVISITED = true;
 
     /**********************
@@ -75,22 +154,22 @@
      **********************/
     let map;
     let markers = [];
-    let storeData = [];     // 地圖上畫的資料（通常是未拜訪）
-    let removedStores = new Set(); // 本次互動中被標記為已拜訪的 index
+    let storeData = [];
+    let removedStores = new Set();
 
-    // CORS 方案（先直連，失敗再代理）
+    // CORS 方案
     const CORS_INVOCATIONS = [
-      (url)=>fetch(url,{method:'GET',mode:'cors',cache:'no-cache',headers:{'Accept':'application/json, text/plain, */*'}}), // 直連
-      (url)=>fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url)),
-      (url)=>fetch('https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url)),
-      (url)=>fetch('https://cors.isomorphic-git.org/'+url),
+      (url) => fetch(url, {method:'GET', mode:'cors', cache:'no-cache', headers:{'Accept':'application/json, text/plain, */*'}}),
+      (url) => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url)),
+      (url) => fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)),
+      (url) => fetch('https://cors.isomorphic-git.org/' + url),
     ];
 
-    // 🔧 URL builders —— 避免 ? 與 & 亂掉
-    const DATA_URL   = () => `${BASE_API_URL}?onlyUnvisited=${DRAW_ONLY_UNVISITED?'true':'false'}&t=${Date.now()}`;
+    // URL builders
+    const DATA_URL = () => `${BASE_API_URL}?onlyUnvisited=${DRAW_ONLY_UNVISITED?'true':'false'}&t=${Date.now()}`;
     const TOTALS_URL = () => `${BASE_API_URL}?t=${Date.now()}`;
-    const UPDATE_URL = (rowIndex,storeName) =>
-      `${BASE_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}&t=${Date.now()}`;
+    const UPDATE_URL = (rowIndex, storeName) =>
+      `${BASE_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}&token=${SHEET_WRITE_TOKEN}&t=${Date.now()}`;
 
     /**********************
      *  地圖初始化
@@ -104,10 +183,10 @@
           mapTypeId: 'roadmap',
           styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
         });
-        showMessage('地圖初始化完成！點擊「載入店家資料」開始使用','success');
+        showMessage('地圖初始化完成！點擊「載入店家資料」開始使用', 'success');
       } catch (err) {
         console.error('地圖初始化錯誤:', err);
-        showMessage('地圖載入失敗，請檢查網路或 API 設定','error');
+        showMessage('地圖載入失敗，請檢查網路或 API 設定', 'error');
       }
     }
 
@@ -117,7 +196,7 @@
       script.src = `https://maps.googleapis.com/maps/api/js?v=weekly&callback=initMap${keyPart}`;
       script.async = true;
       script.defer = true;
-      script.onerror = () => showMessage('地圖 API 載入失敗','error');
+      script.onerror = () => showMessage('地圖 API 載入失敗', 'error');
       document.head.appendChild(script);
     }
 
@@ -138,25 +217,24 @@
       throw lastErr || new Error('所有通道皆失敗');
     }
 
-    // 從各種可能結構標準化成我們要的欄位
     function normalizeRowObject(obj, idxBase=2) {
-      const pick = (o, keys)=> keys.find(k => k in o && o[k] !== undefined && o[k] !== null);
-      const get  = (o, names, d='')=>{
+      const pick = (o, keys) => keys.find(k => k in o && o[k] !== undefined && o[k] !== null);
+      const get = (o, names, d='') => {
         const k = pick(o, names);
         if (!k) return d;
         return (o[k] ?? d);
       };
 
-      const name   = get(obj, ['餐廳或景點','店名','名稱','name']);
-      const cat    = get(obj, ['類別','分類','category']);
-      const focus  = get(obj, ['關注重點','重點','focus']);
-      const addr   = get(obj, ['地址','address']);
-      const notes  = get(obj, ['備註','說明','description','notes']);
-      const lat    = get(obj, ['緯度','lat','latitude']);
-      const lng    = get(obj, ['經度','lng','longitude']);
-      const time   = get(obj, ['紀錄時間','時間','time']);
-      const visit  = get(obj, ['完成','已拜訪','completed','visited']);
-      const rowIx  = obj.rowIndex || obj.row || obj.rowid || obj._row || null;
+      const name = get(obj, ['餐廳或景點','店名','名稱','name']);
+      const cat = get(obj, ['類別','分類','category']);
+      const focus = get(obj, ['關注重點','重點','focus']);
+      const addr = get(obj, ['地址','address']);
+      const notes = get(obj, ['備註','說明','description','notes']);
+      const lat = get(obj, ['緯度','lat','latitude']);
+      const lng = get(obj, ['經度','lng','longitude']);
+      const time = get(obj, ['紀錄時間','時間','time']);
+      const visit = get(obj, ['完成','已拜訪','completed','visited']);
+      const rowIx = obj.rowIndex || obj.row || obj.rowid || obj._row || null;
 
       return {
         name, category: cat, focus, address: addr, description: notes,
@@ -167,7 +245,7 @@
     function isVisited(store) {
       const v = store.completed ?? store.visited ?? store['已拜訪'] ?? store['完成'];
       if (typeof v === 'boolean') return v;
-      if (typeof v === 'number')  return v === 1;
+      if (typeof v === 'number') return v === 1;
       if (typeof v === 'string') {
         const s = v.trim();
         return ['true','TRUE','True','是','已拜訪','1','✓','✔'].includes(s);
@@ -179,88 +257,93 @@
       try {
         if (typeof data === 'string') data = JSON.parse(data);
       } catch {}
-      if (Array.isArray(data))       return data.map((o,i)=>normalizeRowObject(o,i+2));
+      if (Array.isArray(data)) return data.map((o,i) => normalizeRowObject(o,i+2));
       if (data && Array.isArray(data.data))
-        return data.data.map((o,i)=>normalizeRowObject(o,i+2));
+        return data.data.map((o,i) => normalizeRowObject(o,i+2));
       if (data && Array.isArray(data.values)) {
-        const headers = data.values[0].map(h=>String(h).trim());
-        return data.values.slice(1).map((row,i)=>{
-          const obj = {}; headers.forEach((h,idx)=> obj[h]=row[idx]);
-          obj.rowIndex = i+2; return normalizeRowObject(obj,i+2);
+        const headers = data.values[0].map(h => String(h).trim());
+        return data.values.slice(1).map((row,i) => {
+          const obj = {};
+          headers.forEach((h,idx) => obj[h] = row[idx]);
+          obj.rowIndex = i+2;
+          return normalizeRowObject(obj, i+2);
         });
       }
-      if (data && typeof data==='object') return [normalizeRowObject(data,2)];
+      if (data && typeof data === 'object') return [normalizeRowObject(data,2)];
       return [];
     }
 
     async function loadStoreData() {
       const btn = document.getElementById('loadData');
-      btn.disabled = true; btn.textContent = '載入中…';
-      clearMarkers(); removedStores.clear();
-      showMessage('正在從 Google Sheets 載入資料…','info');
+      btn.disabled = true;
+      btn.textContent = '載入中…';
+      clearMarkers();
+      removedStores.clear();
+      showMessage('正在從 Google Sheets 載入資料…', 'info');
 
       try {
-        // 1) 先抓要畫的（未拜訪）
         const res1 = await fetchWithFallback(DATA_URL());
         const text1 = await res1.text();
-        const arr1  = parseUnknownResponse(text1).filter(s => s.lat && s.lng && s.name);
-        storeData   = DRAW_ONLY_UNVISITED ? arr1.filter(s => !isVisited(s)) : arr1;
+        const arr1 = parseUnknownResponse(text1).filter(s => s.lat && s.lng && s.name);
+        storeData = DRAW_ONLY_UNVISITED ? arr1.filter(s => !isVisited(s)) : arr1;
 
-        // 2) 再抓全部做統計
         let totals = { total: 0, visited: 0, unvisited: 0 };
         try {
           const res2 = await fetchWithFallback(TOTALS_URL());
           const text2 = await res2.text();
-          const all   = parseUnknownResponse(text2);
-          totals.total     = all.length;
-          totals.visited   = all.reduce((n,s)=> n + (isVisited(s)?1:0), 0);
+          const all = parseUnknownResponse(text2);
+          totals.total = all.length;
+          totals.visited = all.reduce((n,s) => n + (isVisited(s)?1:0), 0);
           totals.unvisited = totals.total - totals.visited;
         } catch (e) {
-          console.warn('統計補抓失敗，改用當前資料估算：', e);
+          console.warn('統計補抓失敗：', e);
           totals.total = storeData.length;
-          totals.visited = 0;
           totals.unvisited = storeData.length;
         }
 
         createMarkers();
         applyTotalsToUI(totals);
-        showMessage(`成功載入 ${storeData.length} 筆（地圖繪製筆數）`,'success');
+        showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
         updateActiveMarkersUI();
 
       } catch (err) {
         console.error('載入資料錯誤:', err);
-        showMessage(`載入失敗：${err.message || err}`,'error');
+        showMessage(`載入失敗：${err.message || err}`, 'error');
       } finally {
-        btn.disabled = false; btn.textContent = '📥 載入店家資料';
+        btn.disabled = false;
+        btn.textContent = '📥 載入店家資料';
       }
     }
 
     function applyTotalsToUI(totals) {
-      document.getElementById('totalStores').textContent   = totals.total;
-      document.getElementById('visitedTotal').textContent  = totals.visited;
-      document.getElementById('activeMarkers').textContent = markers.length; // 以實際畫在地圖的為準
+      document.getElementById('totalStores').textContent = totals.total;
+      document.getElementById('visitedTotal').textContent = totals.visited;
+      document.getElementById('activeMarkers').textContent = markers.length;
     }
 
     /**********************
-     *  繪製 / 統計
+     *  繪製標記
      **********************/
     function clearMarkers() {
-      markers.forEach(m => { try{ m.setMap(null) }catch{}; });
+      markers.forEach(m => { try { m.setMap(null) } catch {} });
       markers.length = 0;
     }
 
     function createMarkers() {
       clearMarkers();
       storeData.forEach((store, index) => {
-        if (isVisited(store)) return; // 保險
+        if (isVisited(store)) return;
         const lat = parseFloat(store.lat), lng = parseFloat(store.lng);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
         const marker = new google.maps.Marker({
-          map, position: {lat, lng},
+          map,
+          position: {lat, lng},
           title: store.name || '未知店家',
-          icon: { url:'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                  scaledSize:new google.maps.Size(40,40) }
+          icon: {
+            url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            scaledSize: new google.maps.Size(40, 40)
+          }
         });
 
         const info = new google.maps.InfoWindow({
@@ -283,7 +366,7 @@
 
         marker.infoWindow = info;
         marker.storeIndex = index;
-        marker.rowIndex   = store.rowIndex;
+        marker.rowIndex = store.rowIndex;
         markers.push(marker);
       });
 
@@ -300,11 +383,10 @@
     }
 
     /**********************
-     *  標記為已拜訪（寫回表單）
+     *  標記為已拜訪
      **********************/
     async function markAsVisitedInSheet(rowIndex, storeName) {
-      // 僅建 URL 與呼叫；成功條件：後端回 { success: true }
-      const res  = await fetchWithFallback(UPDATE_URL(rowIndex, storeName));
+      const res = await fetchWithFallback(UPDATE_URL(rowIndex, storeName));
       const json = await res.json();
       if (!json || json.success !== true) {
         throw new Error(json?.message || '更新 Google Sheets 失敗');
@@ -314,73 +396,77 @@
 
     async function removeMarker(storeIndex) {
       const marker = markers.find(m => m.storeIndex === storeIndex);
-      const store  = storeData[storeIndex];
-      if (!marker || !store) { showMessage('找不到要移除的標記','error'); return; }
+      const store = storeData[storeIndex];
+      if (!marker || !store) {
+        showMessage('找不到要移除的標記', 'error');
+        return;
+      }
 
       try {
-        showMessage('正在更新資料…','info');
-        // ✅ 一定要等待後端回 success:true
+        showMessage('正在更新資料…', 'info');
         await markAsVisitedInSheet(store.rowIndex, store.name);
 
-        // 關掉 info 視窗與從地圖移除
         marker.infoWindow?.close();
         marker.setMap(null);
         markers = markers.filter(m => m !== marker);
 
-        // 本地資料也標成已拜訪，避免重畫
         storeData[storeIndex].completed = true;
         removedStores.add(storeIndex);
 
-        // UI 統計同步 +1（總數不變、已拜訪 +1、待拜訪 -1）
         const visitedEl = document.getElementById('visitedTotal');
-        visitedEl.textContent = String(parseInt(visitedEl.textContent||'0',10) + 1);
+        visitedEl.textContent = String(parseInt(visitedEl.textContent || '0', 10) + 1);
         updateActiveMarkersUI();
 
-        showMessage(`已將「${store.name}」標記為已拜訪並同步到 Google Sheets`,'success');
+        showMessage(`已將「${store.name}」標記為已拜訪`, 'success');
       } catch (e) {
         console.error(e);
-        showMessage(`標記失敗：${e.message || e}`,'error');
+        showMessage(`標記失敗：${e.message || e}`, 'error');
       }
     }
 
     /**********************
-     *  搜尋位移
+     *  搜尋位置
      **********************/
     const TAIWAN_LOCATIONS = {
-      '台北':{lat:25.0330,lng:121.5654},'台北市':{lat:25.0330,lng:121.5654},
-      '新北':{lat:25.0150,lng:121.4650},'新北市':{lat:25.0150,lng:121.4650},
-      '桃園':{lat:24.9937,lng:121.2973},'桃園市':{lat:24.9937,lng:121.2973},
-      '台中':{lat:24.1477,lng:120.6736},'台中市':{lat:24.1477,lng:120.6736},
-      '台南':{lat:22.9999,lng:120.2269},'台南市':{lat:22.9999,lng:120.2269},
-      '高雄':{lat:22.6273,lng:120.3014},'高雄市':{lat:22.6273,lng:120.3014},
-      '大安區':{lat:25.0267,lng:121.5433},'信義區':{lat:25.0335,lng:121.5645},
+      '台北': {lat:25.0330, lng:121.5654}, '台北市': {lat:25.0330, lng:121.5654},
+      '新北': {lat:25.0150, lng:121.4650}, '新北市': {lat:25.0150, lng:121.4650},
+      '桃園': {lat:24.9937, lng:121.2973}, '桃園市': {lat:24.9937, lng:121.2973},
+      '台中': {lat:24.1477, lng:120.6736}, '台中市': {lat:24.1477, lng:120.6736},
+      '台南': {lat:22.9999, lng:120.2269}, '台南市': {lat:22.9999, lng:120.2269},
+      '高雄': {lat:22.6273, lng:120.3014}, '高雄市': {lat:22.6273, lng:120.3014},
+      '大安區': {lat:25.0267, lng:121.5433}, '信義區': {lat:25.0335, lng:121.5645},
     };
 
-    function moveMapToLocation(location, name){
-      if(!map) return showMessage('地圖尚未初始化','error');
-      map.setCenter(location); map.setZoom(15);
+    function moveMapToLocation(location, name) {
+      if (!map) return showMessage('地圖尚未初始化', 'error');
+      map.setCenter(location);
+      map.setZoom(15);
       const temp = new google.maps.Marker({
-        map, position:location, title:'搜尋結果: '+name,
-        icon:{url:'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',scaledSize:new google.maps.Size(40,40)}
+        map,
+        position: location,
+        title: '搜尋結果: ' + name,
+        icon: {
+          url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+          scaledSize: new google.maps.Size(40, 40)
+        }
       });
-      setTimeout(()=> temp.setMap(null), 5000);
-      showMessage(`已移動到: ${name}`,'success');
+      setTimeout(() => temp.setMap(null), 5000);
+      showMessage(`已移動到: ${name}`, 'success');
     }
 
-    async function searchAndMoveMap(){
+    async function searchAndMoveMap() {
       const input = document.getElementById('addressSearch');
-      const address = (input.value||'').trim();
-      if(!address) return showMessage('請輸入地址或區域名稱','error');
+      const address = (input.value || '').trim();
+      if (!address) return showMessage('請輸入地址或區域名稱', 'error');
 
       const preset = TAIWAN_LOCATIONS[address] || TAIWAN_LOCATIONS[address+'市'] || TAIWAN_LOCATIONS[address+'區'];
       if (preset) return moveMapToLocation(preset, address);
 
-      // 有 Geocoder 就用
       if (window.google?.maps?.Geocoder) {
         new google.maps.Geocoder().geocode(
-          { address: address+' 台灣', region:'TW', language:'zh-TW' },
-          (results,status)=>{
-            if(status==='OK' && results[0]){
+          { address: address + ' 台灣', region: 'TW', language: 'zh-TW' },
+          (results, status) => {
+            if (status === 'OK' && results[0]) {
               moveMapToLocation({
                 lat: results[0].geometry.location.lat(),
                 lng: results[0].geometry.location.lng()
@@ -395,34 +481,39 @@
       }
     }
 
-    async function searchWithNominatim(address){
-      try{
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address+' 台灣')}&limit=1&countrycodes=tw`,
-        { headers:{'User-Agent':'StoreTracker/1.0'} });
+    async function searchWithNominatim(address) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ' 台灣')}&limit=1&countrycodes=tw`,
+          { headers: {'User-Agent': 'StoreTracker/1.0'} }
+        );
         const arr = await res.json();
-        if(arr && arr.length){
-          moveMapToLocation({lat:parseFloat(arr[0].lat),lng:parseFloat(arr[0].lon)}, arr[0].display_name);
+        if (arr && arr.length) {
+          moveMapToLocation(
+            {lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon)},
+            arr[0].display_name
+          );
         } else {
-          showMessage('找不到指定的位置，請輸入更具體的地址','error');
+          showMessage('找不到指定的位置，請輸入更具體的地址', 'error');
         }
-      } catch(e){
-        showMessage('搜尋服務暫時無法使用','error');
+      } catch (e) {
+        showMessage('搜尋服務暫時無法使用', 'error');
       }
     }
 
     /**********************
      *  UI 輔助
      **********************/
-    function showMessage(msg,type='info'){
-      const div=document.getElementById('messages');
-      const el=document.createElement('div');
-      el.className=type; el.textContent=msg;
+    function showMessage(msg, type='info') {
+      const div = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = type;
+      el.textContent = msg;
       div.appendChild(el);
-      setTimeout(()=> el.remove(), 5000);
+      setTimeout(() => el.remove(), 5000);
     }
 
-    // 頁面載入：先載入地圖
-    window.addEventListener('load', ()=>{ loadGoogleMapsAPI(); });
+    window.addEventListener('load', () => { loadGoogleMapsAPI(); });
   </script>
 </body>
 </html>

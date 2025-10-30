@@ -155,56 +155,142 @@ async function getMapApiKey() {
       }
     }
 
-    /**********************
-     *  地圖與標記
-     **********************/
-    function initMap(){
-      const c={lat:25.0330,lng:121.5654};
-      map=new google.maps.Map(document.getElementById('map'),{zoom:12,center:c});
-      showMessage('地圖初始化完成','success');
-    }
+   <script>
+  /**********************
+   *  地圖與標記
+   **********************/
+  let map;
+  let markers = [];
+  let storeData = [];
 
-    function createMarkers(){
-      markers.forEach(m=>m.setMap(null));markers=[];
-      storeData.forEach((s,i)=>{
-        if(s.completed)return;
-        const lat=parseFloat(s.lat),lng=parseFloat(s.lng);
-        if(!lat||!lng)return;
-        const marker=new google.maps.Marker({
-          map,position:{lat,lng},title:s.name||'未知店家',
-          icon:{url:'https://maps.google.com/mapfiles/ms/icons/red-dot.png',scaledSize:new google.maps.Size(40,40)}
-        });
-        const info=new google.maps.InfoWindow({
-          content:`<div class="info-window">
-            <h3>${s.name||'未知店家'}</h3>
-            <p><strong>地址:</strong>${s.address||'無'}</p>
-            <p><strong>備註:</strong>${s.description||'無'}</p>
+  async function initMap() {
+    const center = { lat: 25.0330, lng: 121.5654 };
+    map = new google.maps.Map(document.getElementById('map'), {
+      zoom: 12,
+      center: center
+    });
+    showMessage('地圖初始化完成', 'success');
+  }
+
+  /**********************
+   *  資料載入與轉換
+   **********************/
+  async function loadStoreData() {
+    try {
+      const url = await GET_URL(); // 你原本讀取 Google Apps Script 的函式
+      const res = await fetchWithFallback(url);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+
+      // ✅ 將中文欄位統一轉換成英文 key
+      storeData = json.data.map(s => ({
+        rowIndex: s.rowIndex,
+        name: s['餐廳或景點'] || s.name || '未命名',
+        category: s['類別'] || '',
+        focus: s['關注重點'] || '',
+        address: s['地址'] || '',
+        description: s['備註'] || '',
+        lat: parseFloat(s['緯度'] || s.lat || 0),
+        lng: parseFloat(s['經度'] || s.lng || 0),
+        completed: ['是', 'true', '1'].includes(String(s['完成']).toLowerCase())
+      }));
+
+      createMarkers();
+      document.getElementById('totalCount').textContent = storeData.length;
+      document.getElementById('visitedTotal').textContent =
+        storeData.filter(s => s.completed).length;
+      showMessage('資料載入成功', 'success');
+    } catch (err) {
+      showMessage(`資料載入失敗：${err.message}`, 'error');
+    }
+  }
+
+  /**********************
+   *  標記與資訊視窗
+   **********************/
+  function createMarkers() {
+    // 清除舊標記
+    markers.forEach(m => m.setMap(null));
+    markers = [];
+
+    storeData.forEach((s, i) => {
+      if (s.completed) return;
+      if (!s.lat || !s.lng) return;
+
+      const marker = new google.maps.Marker({
+        map,
+        position: { lat: s.lat, lng: s.lng },
+        title: s.name || '未知店家',
+        icon: {
+          url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+          scaledSize: new google.maps.Size(40, 40)
+        }
+      });
+
+      const info = new google.maps.InfoWindow({
+        content: `
+          <div class="info-window">
+            <h3>${s.name || '未知店家'}</h3>
+            <p><strong>類別：</strong>${s.category || '無'}</p>
+            <p><strong>關注重點：</strong>${s.focus || '無'}</p>
+            <p><strong>地址：</strong>${s.address || '無'}</p>
+            <p><strong>備註：</strong>${s.description || '無'}</p>
             <button class="remove-btn" onclick="removeMarker(${i})">✅ 標記為已拜訪</button>
           </div>`
-        });
-        marker.addListener('click',()=>{markers.forEach(m=>m.infoWindow?.close());info.open(map,marker);});
-        marker.infoWindow=info;marker.storeIndex=i;marker.rowIndex=s.rowIndex;
-        markers.push(marker);
       });
-      document.getElementById('activeMarkers').textContent=markers.length;
-    }
 
-    async function removeMarker(idx){
-      const m=markers.find(x=>x.storeIndex===idx);
-      const s=storeData[idx];
-      if(!m||!s)return showMessage('找不到標記','error');
-      try{
-        showMessage('更新中…','info');
-        const url=await UPDATE_URL(s.rowIndex,s.name);
-        const res=await fetchWithFallback(url);
-        const j=await res.json();
-        if(!j.success)throw new Error(j.message);
-        m.setMap(null);
-        document.getElementById('visitedTotal').textContent=parseInt(document.getElementById('visitedTotal').textContent)+1;
-        document.getElementById('activeMarkers').textContent=parseInt(document.getElementById('activeMarkers').textContent)-1;
-        showMessage(`「${s.name}」已標記為已拜訪`,'success');
-      }catch(e){showMessage(`標記失敗：${e.message}`,'error');}
+      marker.addListener('click', () => {
+        markers.forEach(m => m.infoWindow?.close());
+        info.open(map, marker);
+      });
+
+      marker.infoWindow = info;
+      marker.storeIndex = i;
+      marker.rowIndex = s.rowIndex;
+      markers.push(marker);
+    });
+
+    document.getElementById('activeMarkers').textContent = markers.length;
+  }
+
+  /**********************
+   *  標記為已拜訪
+   **********************/
+  async function removeMarker(idx) {
+    const marker = markers.find(x => x.storeIndex === idx);
+    const store = storeData[idx];
+    if (!marker || !store) return showMessage('找不到標記', 'error');
+
+    try {
+      showMessage('更新中…', 'info');
+      const url = await UPDATE_URL(store.rowIndex, store.name);
+      const res = await fetchWithFallback(url);
+      const j = await res.json();
+      if (!j.success) throw new Error(j.message);
+
+      marker.setMap(null);
+      document.getElementById('visitedTotal').textContent =
+        parseInt(document.getElementById('visitedTotal').textContent) + 1;
+      document.getElementById('activeMarkers').textContent =
+        parseInt(document.getElementById('activeMarkers').textContent) - 1;
+
+      showMessage(`「${store.name}」已標記為已拜訪`, 'success');
+    } catch (e) {
+      showMessage(`標記失敗：${e.message}`, 'error');
     }
+  }
+
+  /**********************
+   *  輔助訊息函式
+   **********************/
+  function showMessage(msg, type = 'info') {
+    const el = document.getElementById('message');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `msg ${type}`;
+    setTimeout(() => (el.textContent = ''), 2500);
+  }
+</script>
 
     /**********************
      *  搜尋地點

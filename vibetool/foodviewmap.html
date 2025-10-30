@@ -159,18 +159,9 @@
      * 可調參數區
      **********************/
 
-    // 🚨 這是最重要的設定：請填入您的 Google Apps Script 部署 Web App URL (包含 doGet 和 doPost 邏輯的那個專案)
-    const YOUR_GAS_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
-
-    // ✅ Google Apps Script Web App URL (用於讀取資料，GET 請求)
-    const BASE_API_URL = YOUR_GAS_DEPLOYMENT_URL;
-
-    // ✅ 安全寫入 API URL (用於寫入資料，POST 請求)。與讀取使用相同的單一 GAS 部署 URL。
-    const WRITE_API_URL = YOUR_GAS_DEPLOYMENT_URL; 
-
-    // ✅ Google Sheets 寫入 Token
-    // ⚠️ 請保持為空字串，因為 Token 已經寫入您的 Apps Script 伺服器端了！
-    const SHEET_WRITE_TOKEN = ''; 
+    // ✅ Google Apps Script Web App URL (用於讀取/寫入)
+    // 🚨 請貼上您合併專案後「重新部署」的 Web App URL
+    const BASE_API_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec'; 
 
     // ✅ Google Maps Key（可留空）
     const GOOGLE_MAPS_KEY = '';
@@ -194,10 +185,9 @@
       (url) => fetch('https://cors.isomorphic-git.org/' + url),
     ];
 
-    // URL builders (僅剩讀取資料的 GET URL)
+    // URL builders (讀寫都不需要 Token)
     const DATA_URL = () => `${BASE_API_URL}?onlyUnvisited=${DRAW_ONLY_UNVISITED?'true':'false'}&t=${Date.now()}`;
     const TOTALS_URL = () => `${BASE_API_URL}?t=${Date.now()}`;
-    // 寫入 URL 由 markAsVisitedInSheet 決定使用 BASE_API_URL 或 WRITE_API_URL
 
     /**********************
      * 地圖初始化
@@ -255,58 +245,6 @@
       }
     }
 
-    function normalizeRowObject(obj, idxBase=2) {
-      // 此函式保留用於向後兼容性，但主要依賴 GAS #1 回傳的正規化資料
-      const pick = (o, keys) => keys.find(k => k in o && o[k] !== undefined && o[k] !== null);
-      const get = (o, names, d='') => {
-        const k = pick(o, names);
-        if (!k) return d;
-        return (o[k] ?? d);
-      };
-
-      const name = get(obj, ['餐廳或景點','店名','名稱','name']);
-      const cat = get(obj, ['類別','分類','category']);
-      const focus = get(obj, ['關注重點','重點','focus']);
-      const addr = get(obj, ['地址','address']);
-      const notes = get(obj, ['備註','說明','description','notes']);
-      const lat = get(obj, ['緯度','lat','latitude']);
-      const lng = get(obj, ['經度','lng','longitude']);
-      const time = get(obj, ['紀錄時間','時間','time']);
-      const rowIx = obj.rowIndex || obj.row || obj.rowid || obj._row || null;
-      
-      return {
-        name, category: cat, focus, address: addr, description: notes,
-        lat, lng, recordTime: time, completed: isVisited(obj), rowIndex: rowIx || idxBase
-      };
-    }
-
-    function isVisited(store) {
-      const v = store.completed ?? store.visited ?? store['已拜訪'] ?? store['完成'];
-      if (typeof v === 'boolean') return v;
-      if (typeof v === 'number') return v === 1;
-      if (typeof v === 'string') {
-        const s = v.trim();
-        return ['true','TRUE','True','是','已拜訪','1','✓','✔'].includes(s);
-      }
-      return false;
-    }
-
-    function parseUnknownResponse(data) {
-      try {
-        if (typeof data === 'string') data = JSON.parse(data);
-      } catch {}
-      
-      if (data && data.success === true && Array.isArray(data.data)) {
-        return data.data; 
-      }
-      
-      if (Array.isArray(data)) return data.map((o,i) => normalizeRowObject(o,i+2));
-      if (data && Array.isArray(data.data))
-        return data.data.map((o,i) => normalizeRowObject(o,i+2));
-      
-      return [];
-    }
-
     async function loadStoreData() {
       const btn = document.getElementById('loadData');
       btn.disabled = true;
@@ -316,23 +254,33 @@
       showMessage('正在從 Google Sheets 載入資料…', 'info');
 
       try {
+        // 讀取請求不再需要 Token
         const res1 = await fetchWithFallback(DATA_URL());
         const text1 = await res1.text();
         const dataResponse = JSON.parse(text1);
 
         if (!dataResponse.success) {
+          // 這裡會捕獲錯誤
           throw new Error(dataResponse.message || '資料讀取失敗');
         }
         
+        // 確保 data 欄位存在
+        if (!Array.isArray(dataResponse.data)) {
+            throw new Error('GAS 伺服器回傳的資料結構錯誤 (缺少 data 陣列)');
+        }
+
+        // 僅保留有經緯度的有效店家
         storeData = dataResponse.data.filter(s => s.lat && s.lng && s.name); 
 
+        // 讀取統計數據
         let totals = dataResponse.meta || { total: storeData.length, visited: 0, unvisited: storeData.length };
         
-        if (!dataResponse.meta) {
-          const fullRes = await fetchWithFallback(TOTALS_URL());
-          const fullText = await fullRes.text();
-          const fullDataResponse = JSON.parse(fullText);
-          totals = fullDataResponse.meta || totals;
+        // 為了確保統計數字準確，可能需要額外呼叫一次 GAS 取得完整的 totals (如果 GAS 沒在第一次回傳完整的話)
+        if (!dataResponse.meta || totals.total === 0) {
+            const fullRes = await fetchWithFallback(TOTALS_URL());
+            const fullText = await fullRes.text();
+            const fullDataResponse = JSON.parse(fullText);
+            totals = fullDataResponse.meta || totals;
         }
 
         createMarkers();
@@ -342,7 +290,8 @@
 
       } catch (err) {
         console.error('載入資料錯誤:', err);
-        showMessage(`載入失敗：${err.message || err}`, 'error');
+        // 如果是 CORS 錯誤，通常是 Failed to fetch，提示使用者檢查部署設定
+        showMessage(`載入失敗：${err.message || err} (請檢查 GAS 部署權限是否為「任何人」)`, 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = '📥 載入店家資料';
@@ -366,7 +315,8 @@
     function createMarkers() {
       clearMarkers();
       storeData.forEach((store, index) => {
-        if (isVisited(store)) return; 
+        // 假設 GAS 已經過濾掉已拜訪，但為了前端安全檢查
+        if (store.completed) return; 
         
         const lat = parseFloat(store.lat), lng = parseFloat(store.lng);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
@@ -376,7 +326,8 @@
           position: {lat, lng},
           title: store.name || '未知店家',
           icon: {
-            url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            // 使用綠色圖標表示待辦
+            url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
             scaledSize: new google.maps.Size(40, 40)
           }
         });
@@ -418,49 +369,39 @@
     }
 
     /**********************
-     * 標記為已拜訪 (使用安全代理邏輯)
+     * 標記為已拜訪 (POST 寫入 - 無 Token)
      **********************/
     async function markAsVisitedInSheet(rowIndex, storeName) {
-      // 判斷要呼叫的 URL：如果設定了 WRITE_API_URL (即您的 GAS URL)，就呼叫它
-      const useProxy = !!WRITE_API_URL;
-      const targetUrl = useProxy ? WRITE_API_URL : BASE_API_URL;
+      // 寫入不需要 Token，直接發送請求
+      const targetUrl = BASE_API_URL;
       
       const payload = {
         action: 'markVisited',
         rowIndex: rowIndex,
-        storeName: storeName,
+        storeName: storeName
       };
-
-      if (!useProxy) {
-          // 如果沒有使用 WRITE_API_URL，且必須直接連 BASE_API_URL (這不安全)
-          payload.token = SHEET_WRITE_TOKEN;
-          if (!SHEET_WRITE_TOKEN) {
-              showMessage('❌ 寫入 Token 為空，且未設定 WRITE_API_URL。寫入操作將會失敗！', 'error');
-              throw new Error('未設定寫入 Token/代理');
-          }
-      } 
-      // 當 useProxy=true 時 (即 WRITE_API_URL 已設定)，前端不會傳送 Token，完全仰賴 GAS 伺服器端檢查。
 
       try {
         const res = await fetch(targetUrl, {
           method: 'POST',
+          // ⚠️ Apps Script 的 doPost(e) 會透過檢查 Content-Type: application/json
+          //    來提供一定程度的 CSRF 保護 (阻止簡單的表單提交攻擊)
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json' 
           },
           body: JSON.stringify(payload)
         });
         
         if (!res.ok) {
-          throw new Error(`HTTP 錯誤: ${res.status} (目標: ${targetUrl})`);
+          throw new Error(`HTTP 錯誤: ${res.status} (請檢查 GAS 部署權限是否為「任何人」)`);
         }
 
         const json = await res.json();
         if (!json || json.success !== true) {
-          throw new Error(json?.message || json?.error || '更新 Google Sheets 失敗，請檢查 GAS 日誌或代理伺服器');
+          throw new Error(json?.message || json?.error || '更新 Google Sheets 失敗，請檢查 doPost(e) 函式執行結果');
         }
         return json;
       } catch (e) {
-          // 捕獲並重新拋出錯誤，讓 removeMarker 處理 UI 訊息
           throw e;
       }
     }
@@ -477,8 +418,9 @@
       if (infoWindow) infoWindow.close();
 
       try {
-        showMessage(`正在安全地標記「${store.name}」為已完成…`, 'info');
+        showMessage(`正在標記「${store.name}」為已完成…`, 'info');
         
+        // 確保 store.rowIndex 是正確的 Sheets 行號
         await markAsVisitedInSheet(store.rowIndex, store.name);
 
         marker.setMap(null);
@@ -487,12 +429,14 @@
         storeData[storeIndex].completed = true;
         
         const visitedEl = document.getElementById('visitedTotal');
-        visitedEl.textContent = String(parseInt(visitedEl.textContent || '0', 10) + 1);
+        // 讀取目前的總數，並增加 1
+        visitedEl.textContent = String(parseInt(visitedEl.textContent || '0', 10) + 1); 
         updateActiveMarkersUI();
 
         showMessage(`✅ 已將「${store.name}」標記為已拜訪並更新 Sheets`, 'success');
       } catch (e) {
         console.error(e);
+        // 顯示更詳細的錯誤信息
         showMessage(`標記失敗：${e.message || e}`, 'error');
       }
     }
@@ -577,6 +521,47 @@
         showMessage('搜尋服務暫時無法使用', 'error');
       }
     }
+
+    /**********************
+     * UI 輔助 (保持不變)
+     **********************/
+    function showMessage(msg, type='info') {
+      const div = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = type;
+      el.textContent = msg;
+      div.appendChild(el);
+      setTimeout(() => el.remove(), 5000);
+    }
+    
+    /**********************
+     * Cookie 範例 (新增 SameSite 屬性)
+     **********************/
+    /**
+     * 設定 Cookie，強制使用 SameSite=Lax (或 Strict)
+     * 這可以防止瀏覽器在跨站請求中發送此 Cookie，增強 CSRF 防禦。
+     * 僅用於前端儲存偏好，與 Apps Script 的 API 請求無關。
+     * @param {string} name Cookie 名稱
+     * @param {string} value Cookie 值
+     * @param {number} days 儲存天數
+     */
+    function setPreferenceCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        // 🚨 關鍵：加入 SameSite=Lax 屬性
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax"; 
+        console.log(`Cookie set: ${name}=${value}; SameSite=Lax`);
+    }
+
+    window.addEventListener('load', () => { 
+        loadGoogleMapsAPI(); 
+        // 範例：應用程式載入時設定一個 Cookie
+        setPreferenceCookie('map_theme', 'default', 7); 
+    });
 
     /**********************
      * UI 輔助 (保持不變)

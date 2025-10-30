@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
@@ -156,17 +156,19 @@
 
   <script>
     /**********************
-     * 可調參數區
+     * 可調參數區 (請務必在部署後更新這兩個值)
      **********************/
 
-    // ✅ Google Apps Script Web App URL (用於讀取/寫入)
-    // 🚨 請貼上您合併專案後「重新部署」的 Web App URL
+    // 1. 🚨 BASE_API_URL: 單一 Web App URL
     const BASE_API_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec'; 
 
-    // ✅ Google Maps Key（可留空）
+    // 2. 🚨 PROXY_TOKEN: 呼叫 Geocoding 代理所需的密鑰。
+    const PROXY_TOKEN = 'GASsecrettoken4check'; 
+    
+    // ✅ Google Maps Key（可留空，因為地圖操作不需 Key，Geocoding 透過代理處理）
     const GOOGLE_MAPS_KEY = '';
 
-    // ✅ 地圖只畫未拜訪
+    // 地圖只畫未拜訪
     const DRAW_ONLY_UNVISITED = true;
 
     /**********************
@@ -175,19 +177,23 @@
     let map;
     let markers = [];
     let storeData = [];
-    let removedStores = new Set();
     let infoWindow = null; 
 
-    // CORS 方案 (用於 GET 讀取)
+    // CORS 方案 (用於 GET 讀取) - 僅在呼叫 Apps Script 失敗時嘗試
     const CORS_INVOCATIONS = [
       (url) => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url)),
       (url) => fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)),
       (url) => fetch('https://cors.isomorphic-git.org/' + url),
     ];
 
-    // URL builders (讀寫都不需要 Token)
-    const DATA_URL = () => `${BASE_API_URL}?onlyUnvisited=${DRAW_ONLY_UNVISITED?'true':'false'}&t=${Date.now()}`;
-    const TOTALS_URL = () => `${BASE_API_URL}?t=${Date.now()}`;
+    // URL builders
+    // Data/Totals GET 請求都帶 action=data
+    const DATA_URL = (full = false) => `${BASE_API_URL}?action=data&onlyUnvisited=${full?'false':'true'}&t=${Date.now()}`;
+    
+    // Geocoding GET 請求帶 action=geocode 和 token 
+    const GEOCODE_URL = (address) => 
+      `${BASE_API_URL}?action=geocode&address=${encodeURIComponent(address)}&token=${PROXY_TOKEN}&t=${Date.now()}`;
+
 
     /**********************
      * 地圖初始化
@@ -250,39 +256,28 @@
       btn.disabled = true;
       btn.textContent = '載入中…';
       clearMarkers();
-      removedStores.clear();
       showMessage('正在從 Google Sheets 載入資料…', 'info');
 
+      if (BASE_API_URL === 'YOUR_SINGLE_WEBAPP_URL_HERE') {
+         showMessage('載入失敗：請設定 index.html 中的 BASE_API_URL', 'error');
+         btn.disabled = false;
+         btn.textContent = '📥 載入店家資料';
+         return;
+      }
+
       try {
-        // 讀取請求不再需要 Token
-        const res1 = await fetchWithFallback(DATA_URL());
+        // 呼叫 BASE_API_URL?action=data
+        const res1 = await fetchWithFallback(DATA_URL(false)); 
         const text1 = await res1.text();
         const dataResponse = JSON.parse(text1);
 
         if (!dataResponse.success) {
-          // 這裡會捕獲錯誤
           throw new Error(dataResponse.message || '資料讀取失敗');
         }
         
-        // 確保 data 欄位存在
-        if (!Array.isArray(dataResponse.data)) {
-            throw new Error('GAS 伺服器回傳的資料結構錯誤 (缺少 data 陣列)');
-        }
-
-        // 僅保留有經緯度的有效店家
         storeData = dataResponse.data.filter(s => s.lat && s.lng && s.name); 
-
-        // 讀取統計數據
         let totals = dataResponse.meta || { total: storeData.length, visited: 0, unvisited: storeData.length };
         
-        // 為了確保統計數字準確，可能需要額外呼叫一次 GAS 取得完整的 totals (如果 GAS 沒在第一次回傳完整的話)
-        if (!dataResponse.meta || totals.total === 0) {
-            const fullRes = await fetchWithFallback(TOTALS_URL());
-            const fullText = await fullRes.text();
-            const fullDataResponse = JSON.parse(fullText);
-            totals = fullDataResponse.meta || totals;
-        }
-
         createMarkers();
         applyTotalsToUI(totals);
         showMessage(`成功載入 ${storeData.length} 筆待拜訪店家資料 (總計 ${totals.total} 筆)`, 'success');
@@ -290,8 +285,7 @@
 
       } catch (err) {
         console.error('載入資料錯誤:', err);
-        // 如果是 CORS 錯誤，通常是 Failed to fetch，提示使用者檢查部署設定
-        showMessage(`載入失敗：${err.message || err} (請檢查 GAS 部署權限是否為「任何人」)`, 'error');
+        showMessage(`載入失敗：${err.message || err} (請檢查 GAS 部署權限)`, 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = '📥 載入店家資料';
@@ -305,7 +299,7 @@
     }
 
     /**********************
-     * 繪製標記
+     * 繪製標記 
      **********************/
     function clearMarkers() {
       markers.forEach(m => { try { m.setMap(null) } catch {} });
@@ -315,7 +309,6 @@
     function createMarkers() {
       clearMarkers();
       storeData.forEach((store, index) => {
-        // 假設 GAS 已經過濾掉已拜訪，但為了前端安全檢查
         if (store.completed) return; 
         
         const lat = parseFloat(store.lat), lng = parseFloat(store.lng);
@@ -326,7 +319,6 @@
           position: {lat, lng},
           title: store.name || '未知店家',
           icon: {
-            // 使用綠色圖標表示待辦
             url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
             scaledSize: new google.maps.Size(40, 40)
           }
@@ -369,10 +361,9 @@
     }
 
     /**********************
-     * 標記為已拜訪 (POST 寫入 - 無 Token)
+     * 標記為已拜訪 (POST 寫入)
      **********************/
     async function markAsVisitedInSheet(rowIndex, storeName) {
-      // 寫入不需要 Token，直接發送請求
       const targetUrl = BASE_API_URL;
       
       const payload = {
@@ -382,10 +373,9 @@
       };
 
       try {
+        // 透過 POST 請求，觸發 getnpost.gs 裡的 doPost 函式
         const res = await fetch(targetUrl, {
           method: 'POST',
-          // ⚠️ Apps Script 的 doPost(e) 會透過檢查 Content-Type: application/json
-          //    來提供一定程度的 CSRF 保護 (阻止簡單的表單提交攻擊)
           headers: {
             'Content-Type': 'application/json' 
           },
@@ -393,12 +383,12 @@
         });
         
         if (!res.ok) {
-          throw new Error(`HTTP 錯誤: ${res.status} (請檢查 GAS 部署權限是否為「任何人」)`);
+          throw new Error(`HTTP 錯誤: ${res.status}`);
         }
 
         const json = await res.json();
         if (!json || json.success !== true) {
-          throw new Error(json?.message || json?.error || '更新 Google Sheets 失敗，請檢查 doPost(e) 函式執行結果');
+          throw new Error(json?.message || json?.error || '更新 Google Sheets 失敗');
         }
         return json;
       } catch (e) {
@@ -420,7 +410,6 @@
       try {
         showMessage(`正在標記「${store.name}」為已完成…`, 'info');
         
-        // 確保 store.rowIndex 是正確的 Sheets 行號
         await markAsVisitedInSheet(store.rowIndex, store.name);
 
         marker.setMap(null);
@@ -429,35 +418,22 @@
         storeData[storeIndex].completed = true;
         
         const visitedEl = document.getElementById('visitedTotal');
-        // 讀取目前的總數，並增加 1
         visitedEl.textContent = String(parseInt(visitedEl.textContent || '0', 10) + 1); 
         updateActiveMarkersUI();
 
         showMessage(`✅ 已將「${store.name}」標記為已拜訪並更新 Sheets`, 'success');
       } catch (e) {
         console.error(e);
-        // 顯示更詳細的錯誤信息
         showMessage(`標記失敗：${e.message || e}`, 'error');
       }
     }
     
-    // 將 removeMarker 函式暴露給 InfoWindow 內的 onclick
     window.removeMarker = removeMarker;
 
 
     /**********************
-     * 搜尋位置 (保持不變)
+     * 搜尋位置 (呼叫單一 Web App 的 Geocoding 代理)
      **********************/
-    const TAIWAN_LOCATIONS = {
-      '台北': {lat:25.0330, lng:121.5654}, '台北市': {lat:25.0330, lng:121.5654},
-      '新北': {lat:25.0150, lng:121.4650}, '新北市': {lat:25.0150, lng:121.4650},
-      '桃園': {lat:24.9937, lng:121.2973}, '桃園市': {lat:24.9937, lng:121.2973},
-      '台中': {lat:24.1477, lng:120.6736}, '台中市': {lat:24.1477, lng:120.6736},
-      '台南': {lat:22.9999, lng:120.2269}, '台南市': {lat:22.9999, lng:120.2269},
-      '高雄': {lat:22.6273, lng:120.3014}, '高雄市': {lat:22.6273, lng:120.3014},
-      '大安區': {lat:25.0267, lng:121.5433}, '信義區': {lat:25.0335, lng:121.5645},
-    };
-
     function moveMapToLocation(location, name) {
       if (!map) return showMessage('地圖尚未初始化', 'error');
       map.setCenter(location);
@@ -480,50 +456,61 @@
       const address = (input.value || '').trim();
       if (!address) return showMessage('請輸入地址或區域名稱', 'error');
 
-      const preset = TAIWAN_LOCATIONS[address] || TAIWAN_LOCATIONS[address+'市'] || TAIWAN_LOCATIONS[address+'區'];
-      if (preset) return moveMapToLocation(preset, address);
+      const btn = document.querySelector('.controls button[onclick="searchAndMoveMap()"]');
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '搜尋中...';
 
-      if (window.google?.maps?.Geocoder) {
-        new google.maps.Geocoder().geocode(
-          { address: address + ' 台灣', region: 'TW', language: 'zh-TW' },
-          (results, status) => {
-            if (status === 'OK' && results[0]) {
-              moveMapToLocation({
-                lat: results[0].geometry.location.lat(),
-                lng: results[0].geometry.location.lng()
-              }, results[0].formatted_address);
-            } else {
-              searchWithNominatim(address);
-            }
-          }
-        );
-      } else {
-        searchWithNominatim(address);
+      if (BASE_API_URL === 'YOUR_SINGLE_WEBAPP_URL_HERE' || PROXY_TOKEN === 'YOUR_SECRET_PROXY_TOKEN_HERE') {
+         showMessage('Geocoding 搜尋失敗：請設定 BASE_API_URL 和 PROXY_TOKEN', 'error');
+         btn.disabled = false;
+         btn.textContent = originalText;
+         return;
       }
-    }
+      
+      showMessage(`正在透過 Apps Script 代理搜尋「${address}」...`, 'info');
 
-    async function searchWithNominatim(address) {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ' 台灣')}&limit=1&countrycodes=tw`,
-          { headers: {'User-Agent': 'StoreTracker/1.0'} }
-        );
-        const arr = await res.json();
-        if (arr && arr.length) {
-          moveMapToLocation(
-            {lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon)},
-            arr[0].display_name
-          );
-        } else {
-          showMessage('找不到指定的位置，請輸入更具體的地址', 'error');
+        // 呼叫 BASE_API_URL?action=geocode&token=...
+        const geocodeUrl = GEOCODE_URL(address);
+        
+        const res = await fetch(geocodeUrl);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP 錯誤: ${res.status}`);
         }
+        
+        const json = await res.json();
+
+        if (!json.success) {
+            // 處理 Geocoding 代理服務回傳的錯誤 (例如 Unauthorized 或 API 錯誤)
+            throw new Error(json.message || 'Geocoding 代理服務失敗');
+        }
+
+        // Geocoding 結果在 json.data 陣列中
+        const results = json.data;
+        const status = json.meta.status;
+
+        if (status !== 'OK' || !results || results.length === 0) {
+             throw new Error(`Google Geocoding 服務錯誤或找不到結果。狀態: ${status || '未知'}`);
+        }
+
+        const location = results[0].geometry.location;
+        const formattedAddress = results[0].formatted_address;
+
+        moveMapToLocation(location, formattedAddress);
+        
       } catch (e) {
-        showMessage('搜尋服務暫時無法使用', 'error');
+        console.error('Geocoding 錯誤:', e);
+        showMessage(`搜尋失敗：${e.message || e}。請檢查 GAS 中的 PW_TOKEN 和 API_KEY 配置。`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
       }
     }
 
     /**********************
-     * UI 輔助 (保持不變)
+     * UI 輔助
      **********************/
     function showMessage(msg, type='info') {
       const div = document.getElementById('messages');
@@ -534,48 +521,9 @@
       setTimeout(() => el.remove(), 5000);
     }
     
-    /**********************
-     * Cookie 範例 (新增 SameSite 屬性)
-     **********************/
-    /**
-     * 設定 Cookie，強制使用 SameSite=Lax (或 Strict)
-     * 這可以防止瀏覽器在跨站請求中發送此 Cookie，增強 CSRF 防禦。
-     * 僅用於前端儲存偏好，與 Apps Script 的 API 請求無關。
-     * @param {string} name Cookie 名稱
-     * @param {string} value Cookie 值
-     * @param {number} days 儲存天數
-     */
-    function setPreferenceCookie(name, value, days) {
-        let expires = "";
-        if (days) {
-            const date = new Date();
-            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-            expires = "; expires=" + date.toUTCString();
-        }
-        // 🚨 關鍵：加入 SameSite=Lax 屬性
-        document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax"; 
-        console.log(`Cookie set: ${name}=${value}; SameSite=Lax`);
-    }
-
     window.addEventListener('load', () => { 
         loadGoogleMapsAPI(); 
-        // 範例：應用程式載入時設定一個 Cookie
-        setPreferenceCookie('map_theme', 'default', 7); 
     });
-
-    /**********************
-     * UI 輔助 (保持不變)
-     **********************/
-    function showMessage(msg, type='info') {
-      const div = document.getElementById('messages');
-      const el = document.createElement('div');
-      el.className = type;
-      el.textContent = msg;
-      div.appendChild(el);
-      setTimeout(() => el.remove(), 5000);
-    }
-
-    window.addEventListener('load', () => { loadGoogleMapsAPI(); });
   </script>
 </body>
 </html>

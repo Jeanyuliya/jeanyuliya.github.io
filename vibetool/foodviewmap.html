@@ -76,20 +76,21 @@
     /**********************
      *  CORS 代理容錯
      **********************/
-    async function fetchWithFallback(url) {
-      const proxies = [
-        (u)=>fetch(u),
-        (u)=>fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(u)),
-        (u)=>fetch('https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u))
-      ];
-      for(const fn of proxies){
-        try{
-          const res=await fn(url);
-          if(res.ok)return res;
-        }catch(e){}
-      }
-      throw new Error('所有通道皆失敗');
-    }
+async function fetchWithFallback(url) {
+  const proxies = [
+    (u) => fetch(u),
+    (u) => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(u)),
+    (u) => fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u))
+  ];
+  for (const fn of proxies) {
+    try {
+      const res = await fn(url);
+      if (res.ok) return res;
+    } catch {}
+  }
+  throw new Error('所有通道皆失敗');
+}
+
 
     /**********************
      *  從 GAS 取 Maps Key（經代理）

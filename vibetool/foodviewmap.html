@@ -158,11 +158,12 @@
     let removedStores = new Set();
 
     // CORS 方案
-    const CORS_INVOCATIONS = [
-      (url) => fetch(url, {method:'GET', mode:'cors'}),
-      (url) => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url)),
-      (url) => fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)),
-      (url) => fetch('https://cors.isomorphic-git.org/' + url),
+const CORS_INVOCATIONS = [
+  (url) => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url)),
+  (url) => fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)),
+  (url) => fetch('https://cors.isomorphic-git.org/' + url),
+];
+
     ];
 
     // URL builders

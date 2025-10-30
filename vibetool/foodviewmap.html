@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>店家追蹤地圖 - 安全版</title>
+  <title>店家追蹤地圖</title>
   <style>
     /* 統一字體為繁體中文友善字體 */
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -159,11 +159,18 @@
      * 可調參數區
      **********************/
 
-    // ✅ 你的 Apps Script Web App URL
-    const BASE_API_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
+    // 🚨 這是最重要的設定：請填入您的 Google Apps Script 部署 Web App URL (包含 doGet 和 doPost 邏輯的那個專案)
+    const YOUR_GAS_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
 
-    // ✅ 寫入操作的 Token (已從 URL 參數轉移到 POST Body)
-    const SHEET_WRITE_TOKEN = 'GASsecrettoken4check'; // ⚠️ 請替換成你的實際 token
+    // ✅ Google Apps Script Web App URL (用於讀取資料，GET 請求)
+    const BASE_API_URL = YOUR_GAS_DEPLOYMENT_URL;
+
+    // ✅ 安全寫入 API URL (用於寫入資料，POST 請求)。與讀取使用相同的單一 GAS 部署 URL。
+    const WRITE_API_URL = YOUR_GAS_DEPLOYMENT_URL; 
+
+    // ✅ Google Sheets 寫入 Token
+    // ⚠️ 請保持為空字串，因為 Token 已經寫入您的 Apps Script 伺服器端了！
+    const SHEET_WRITE_TOKEN = ''; 
 
     // ✅ Google Maps Key（可留空）
     const GOOGLE_MAPS_KEY = '';
@@ -178,7 +185,7 @@
     let markers = [];
     let storeData = [];
     let removedStores = new Set();
-    let infoWindow = null; // 單一 InfoWindow 實例
+    let infoWindow = null; 
 
     // CORS 方案 (用於 GET 讀取)
     const CORS_INVOCATIONS = [
@@ -190,7 +197,7 @@
     // URL builders (僅剩讀取資料的 GET URL)
     const DATA_URL = () => `${BASE_API_URL}?onlyUnvisited=${DRAW_ONLY_UNVISITED?'true':'false'}&t=${Date.now()}`;
     const TOTALS_URL = () => `${BASE_API_URL}?t=${Date.now()}`;
-    // ⚠️ 舊的 UPDATE_URL 已移除，寫入將使用 POST 請求
+    // 寫入 URL 由 markAsVisitedInSheet 決定使用 BASE_API_URL 或 WRITE_API_URL
 
     /**********************
      * 地圖初始化
@@ -204,7 +211,7 @@
           mapTypeId: 'roadmap',
           styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
         });
-        infoWindow = new google.maps.InfoWindow(); // 初始化單一 InfoWindow
+        infoWindow = new google.maps.InfoWindow();
         showMessage('地圖初始化完成！點擊「載入店家資料」開始使用', 'success');
       } catch (err) {
         console.error('地圖初始化錯誤:', err);
@@ -226,7 +233,7 @@
      * 抓資料 + 統計 (GET 讀取)
      **********************/
     async function fetchWithFallback(url) {
-      // 嘗試直接讀取 (因為 GAS 伺服器端已經移除了 HtmlService，現在是標準 JSON)
+      // 嘗試直接讀取
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -249,6 +256,7 @@
     }
 
     function normalizeRowObject(obj, idxBase=2) {
+      // 此函式保留用於向後兼容性，但主要依賴 GAS #1 回傳的正規化資料
       const pick = (o, keys) => keys.find(k => k in o && o[k] !== undefined && o[k] !== null);
       const get = (o, names, d='') => {
         const k = pick(o, names);
@@ -264,7 +272,6 @@
       const lat = get(obj, ['緯度','lat','latitude']);
       const lng = get(obj, ['經度','lng','longitude']);
       const time = get(obj, ['紀錄時間','時間','time']);
-      const visit = obj.completed; // GAS #1 已經正規化過了
       const rowIx = obj.rowIndex || obj.row || obj.rowid || obj._row || null;
       
       return {
@@ -274,7 +281,6 @@
     }
 
     function isVisited(store) {
-      // 由於 GAS #1 現在已經在伺服器端將 '完成' 欄位正規化為 boolean 的 completed 屬性，我們可以直接使用它。
       const v = store.completed ?? store.visited ?? store['已拜訪'] ?? store['完成'];
       if (typeof v === 'boolean') return v;
       if (typeof v === 'number') return v === 1;
@@ -290,13 +296,10 @@
         if (typeof data === 'string') data = JSON.parse(data);
       } catch {}
       
-      // 由於 GAS #1 現在是標準 JSON 回應，我們可以依賴其結構
       if (data && data.success === true && Array.isArray(data.data)) {
-        // GAS #1 回傳的 data 已經是我們需要的正規化結構
         return data.data; 
       }
       
-      // 如果回傳的不是預期的結構，使用舊的解析邏輯
       if (Array.isArray(data)) return data.map((o,i) => normalizeRowObject(o,i+2));
       if (data && Array.isArray(data.data))
         return data.data.map((o,i) => normalizeRowObject(o,i+2));
@@ -313,7 +316,6 @@
       showMessage('正在從 Google Sheets 載入資料…', 'info');
 
       try {
-        // 1. 抓取主要資料 (只抓未拜訪或全部)
         const res1 = await fetchWithFallback(DATA_URL());
         const text1 = await res1.text();
         const dataResponse = JSON.parse(text1);
@@ -322,14 +324,11 @@
           throw new Error(dataResponse.message || '資料讀取失敗');
         }
         
-        // GAS #1 已經根據 DRAW_ONLY_UNVISITED 篩選好了，且已經正規化。
         storeData = dataResponse.data.filter(s => s.lat && s.lng && s.name); 
 
-        // 2. 抓取總數統計 (必須抓全部資料)
         let totals = dataResponse.meta || { total: storeData.length, visited: 0, unvisited: storeData.length };
         
         if (!dataResponse.meta) {
-          // 如果 GAS #1 沒有回傳 meta (例如舊版或錯誤)，則自行計算
           const fullRes = await fetchWithFallback(TOTALS_URL());
           const fullText = await fullRes.text();
           const fullDataResponse = JSON.parse(fullText);
@@ -367,7 +366,6 @@
     function createMarkers() {
       clearMarkers();
       storeData.forEach((store, index) => {
-        // 確保 storeData 內的 completed 狀態是準確的 (雖然 GAS 應已篩選)
         if (isVisited(store)) return; 
         
         const lat = parseFloat(store.lat), lng = parseFloat(store.lng);
@@ -383,12 +381,10 @@
           }
         });
 
-        // 將 store 資訊直接綁定到 marker 上
         marker.storeData = store;
         marker.storeIndex = index;
 
         marker.addListener('click', () => {
-          // 點擊時關閉舊的 infoWindow 並開啟新的
           if (infoWindow) infoWindow.close(); 
           
           const content = `
@@ -422,36 +418,51 @@
     }
 
     /**********************
-     * 標記為已拜訪 (安全 POST 寫入)
+     * 標記為已拜訪 (使用安全代理邏輯)
      **********************/
     async function markAsVisitedInSheet(rowIndex, storeName) {
-      // 🚨 使用 POST 請求，將 Token 放入 Body 中 🚨
+      // 判斷要呼叫的 URL：如果設定了 WRITE_API_URL (即您的 GAS URL)，就呼叫它
+      const useProxy = !!WRITE_API_URL;
+      const targetUrl = useProxy ? WRITE_API_URL : BASE_API_URL;
+      
       const payload = {
         action: 'markVisited',
         rowIndex: rowIndex,
         storeName: storeName,
-        token: SHEET_WRITE_TOKEN // 安全地將 Token 放在 Body 裡
       };
 
-      const res = await fetch(BASE_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      // GAS #1 現在是標準 JSON 服務，不需要 CORS 代理
-      if (!res.ok) {
-        throw new Error(`HTTP 錯誤: ${res.status}`);
-      }
+      if (!useProxy) {
+          // 如果沒有使用 WRITE_API_URL，且必須直接連 BASE_API_URL (這不安全)
+          payload.token = SHEET_WRITE_TOKEN;
+          if (!SHEET_WRITE_TOKEN) {
+              showMessage('❌ 寫入 Token 為空，且未設定 WRITE_API_URL。寫入操作將會失敗！', 'error');
+              throw new Error('未設定寫入 Token/代理');
+          }
+      } 
+      // 當 useProxy=true 時 (即 WRITE_API_URL 已設定)，前端不會傳送 Token，完全仰賴 GAS 伺服器端檢查。
 
-      const json = await res.json();
-      if (!json || json.success !== true) {
-        // 檢查 GAS 傳回的錯誤訊息
-        throw new Error(json?.message || json?.error || '更新 Google Sheets 失敗，請檢查 GAS 日誌');
+      try {
+        const res = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP 錯誤: ${res.status} (目標: ${targetUrl})`);
+        }
+
+        const json = await res.json();
+        if (!json || json.success !== true) {
+          throw new Error(json?.message || json?.error || '更新 Google Sheets 失敗，請檢查 GAS 日誌或代理伺服器');
+        }
+        return json;
+      } catch (e) {
+          // 捕獲並重新拋出錯誤，讓 removeMarker 處理 UI 訊息
+          throw e;
       }
-      return json;
     }
 
     async function removeMarker(storeIndex) {
@@ -463,23 +474,18 @@
         return;
       }
       
-      // 確保 infoWindow 關閉
       if (infoWindow) infoWindow.close();
 
       try {
         showMessage(`正在安全地標記「${store.name}」為已完成…`, 'info');
         
-        // 呼叫新的安全 POST 寫入函式
         await markAsVisitedInSheet(store.rowIndex, store.name);
 
-        // 移除地圖標記
         marker.setMap(null);
         markers = markers.filter(m => m !== marker);
 
-        // 更新 storeData 狀態 (重要，防止重複操作)
         storeData[storeIndex].completed = true;
         
-        // 更新 UI 統計數據
         const visitedEl = document.getElementById('visitedTotal');
         visitedEl.textContent = String(parseInt(visitedEl.textContent || '0', 10) + 1);
         updateActiveMarkersUI();

@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>店家追蹤地圖</title>
+  <title>店家追蹤地圖 - 安全版</title>
   <style>
+    /* 統一字體為繁體中文友善字體 */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: #f5f5f5; }
-    #map { height: 70vh; width: 100%; }
+    body { font-family: 'Microsoft JhengHei', 'Inter', Arial, sans-serif; background: #f5f5f5; }
+    #map { height: 70vh; width: 100%; border-radius: 8px; overflow: hidden; }
     .controls {
       background: white;
       padding: 20px;
@@ -22,19 +23,28 @@
       color: white;
       border: none;
       padding: 12px 24px;
-      border-radius: 5px;
+      border-radius: 8px; /* 統一使用圓角 */
       cursor: pointer;
       font-size: 16px;
       transition: all 0.3s;
+      box-shadow: 0 4px #388E3C; /* 添加立體感 */
     }
-    button:hover { background: #45a049; transform: translateY(-2px); }
-    button:disabled { background: #ccc; cursor: not-allowed; }
+    button:hover { 
+      background: #45a049; 
+      transform: translateY(-2px); 
+      box-shadow: 0 6px #388E3C; 
+    }
+    button:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px #388E3C;
+    }
+    button:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
     #addressSearch {
       flex: 1;
       min-width: 200px;
       padding: 12px;
       border: 2px solid #ddd;
-      border-radius: 5px;
+      border-radius: 8px;
       font-size: 16px;
     }
     .stats {
@@ -43,6 +53,7 @@
       display: flex;
       gap: 30px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      border-radius: 0 0 8px 8px;
     }
     .stat-item {
       display: flex;
@@ -72,6 +83,8 @@
       border-radius: 5px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       animation: slideIn 0.3s ease;
+      /* 確保訊息框在小螢幕下不會溢出 */
+      word-wrap: break-word;
     }
     @keyframes slideIn {
       from { transform: translateX(400px); opacity: 0; }
@@ -105,6 +118,15 @@
       font-size: 14px;
     }
     .remove-btn:hover { background: #45a049; }
+
+    @media (max-width: 600px) {
+      .controls { flex-direction: column; align-items: stretch; }
+      .stats { gap: 15px; justify-content: space-around; }
+      .stat-value { font-size: 24px; }
+      #addressSearch { min-width: 100%; }
+      button { width: 100%; }
+      #messages { right: 10px; left: 10px; top: 10px; max-width: none; }
+    }
   </style>
 </head>
 <body>
@@ -134,13 +156,13 @@
 
   <script>
     /**********************
-     *  可調參數區
+     * 可調參數區
      **********************/
 
     // ✅ 你的 Apps Script Web App URL
     const BASE_API_URL = 'https://script.google.com/macros/s/AKfycbyXe1tkQjcRMaWE-MqYIQmpzL764lcqKSJXfx96kHNYlLE1MyTVA84WnZHfZ_HRhrfz/exec';
 
-    // ✅ 寫入操作的 Token 
+    // ✅ 寫入操作的 Token (已從 URL 參數轉移到 POST Body)
     const SHEET_WRITE_TOKEN = 'GASsecrettoken4check'; // ⚠️ 請替換成你的實際 token
 
     // ✅ Google Maps Key（可留空）
@@ -150,30 +172,28 @@
     const DRAW_ONLY_UNVISITED = true;
 
     /**********************
-     *  內部變數
+     * 內部變數
      **********************/
     let map;
     let markers = [];
     let storeData = [];
     let removedStores = new Set();
+    let infoWindow = null; // 單一 InfoWindow 實例
 
-    // CORS 方案
-const CORS_INVOCATIONS = [
-  (url) => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url)),
-  (url) => fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)),
-  (url) => fetch('https://cors.isomorphic-git.org/' + url),
-];
-
+    // CORS 方案 (用於 GET 讀取)
+    const CORS_INVOCATIONS = [
+      (url) => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url)),
+      (url) => fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)),
+      (url) => fetch('https://cors.isomorphic-git.org/' + url),
     ];
 
-    // URL builders
+    // URL builders (僅剩讀取資料的 GET URL)
     const DATA_URL = () => `${BASE_API_URL}?onlyUnvisited=${DRAW_ONLY_UNVISITED?'true':'false'}&t=${Date.now()}`;
     const TOTALS_URL = () => `${BASE_API_URL}?t=${Date.now()}`;
-    const UPDATE_URL = (rowIndex, storeName) =>
-      `${BASE_API_URL}?action=markVisited&rowIndex=${rowIndex}&storeName=${encodeURIComponent(storeName)}&token=${SHEET_WRITE_TOKEN}&t=${Date.now()}`;
+    // ⚠️ 舊的 UPDATE_URL 已移除，寫入將使用 POST 請求
 
     /**********************
-     *  地圖初始化
+     * 地圖初始化
      **********************/
     function initMap() {
       try {
@@ -184,6 +204,7 @@ const CORS_INVOCATIONS = [
           mapTypeId: 'roadmap',
           styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
         });
+        infoWindow = new google.maps.InfoWindow(); // 初始化單一 InfoWindow
         showMessage('地圖初始化完成！點擊「載入店家資料」開始使用', 'success');
       } catch (err) {
         console.error('地圖初始化錯誤:', err);
@@ -202,20 +223,29 @@ const CORS_INVOCATIONS = [
     }
 
     /**********************
-     *  抓資料 + 統計
+     * 抓資料 + 統計 (GET 讀取)
      **********************/
     async function fetchWithFallback(url) {
-      let lastErr;
-      for (const call of CORS_INVOCATIONS) {
-        try {
-          const res = await call(url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res;
-        } catch (e) {
-          lastErr = e;
+      // 嘗試直接讀取 (因為 GAS 伺服器端已經移除了 HtmlService，現在是標準 JSON)
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+      } catch (e) {
+        // 如果直接讀取失敗，才嘗試 CORS 代理
+        console.warn('直接讀取失敗，嘗試 CORS 代理...', e);
+        let lastErr;
+        for (const call of CORS_INVOCATIONS) {
+          try {
+            const res = await call(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res;
+          } catch (e) {
+            lastErr = e;
+          }
         }
+        throw lastErr || new Error('所有通道皆失敗');
       }
-      throw lastErr || new Error('所有通道皆失敗');
     }
 
     function normalizeRowObject(obj, idxBase=2) {
@@ -234,16 +264,17 @@ const CORS_INVOCATIONS = [
       const lat = get(obj, ['緯度','lat','latitude']);
       const lng = get(obj, ['經度','lng','longitude']);
       const time = get(obj, ['紀錄時間','時間','time']);
-      const visit = get(obj, ['完成','已拜訪','completed','visited']);
+      const visit = obj.completed; // GAS #1 已經正規化過了
       const rowIx = obj.rowIndex || obj.row || obj.rowid || obj._row || null;
-
+      
       return {
         name, category: cat, focus, address: addr, description: notes,
-        lat, lng, recordTime: time, completed: visit, rowIndex: rowIx || idxBase
+        lat, lng, recordTime: time, completed: isVisited(obj), rowIndex: rowIx || idxBase
       };
     }
 
     function isVisited(store) {
+      // 由於 GAS #1 現在已經在伺服器端將 '完成' 欄位正規化為 boolean 的 completed 屬性，我們可以直接使用它。
       const v = store.completed ?? store.visited ?? store['已拜訪'] ?? store['完成'];
       if (typeof v === 'boolean') return v;
       if (typeof v === 'number') return v === 1;
@@ -258,19 +289,18 @@ const CORS_INVOCATIONS = [
       try {
         if (typeof data === 'string') data = JSON.parse(data);
       } catch {}
+      
+      // 由於 GAS #1 現在是標準 JSON 回應，我們可以依賴其結構
+      if (data && data.success === true && Array.isArray(data.data)) {
+        // GAS #1 回傳的 data 已經是我們需要的正規化結構
+        return data.data; 
+      }
+      
+      // 如果回傳的不是預期的結構，使用舊的解析邏輯
       if (Array.isArray(data)) return data.map((o,i) => normalizeRowObject(o,i+2));
       if (data && Array.isArray(data.data))
         return data.data.map((o,i) => normalizeRowObject(o,i+2));
-      if (data && Array.isArray(data.values)) {
-        const headers = data.values[0].map(h => String(h).trim());
-        return data.values.slice(1).map((row,i) => {
-          const obj = {};
-          headers.forEach((h,idx) => obj[h] = row[idx]);
-          obj.rowIndex = i+2;
-          return normalizeRowObject(obj, i+2);
-        });
-      }
-      if (data && typeof data === 'object') return [normalizeRowObject(data,2)];
+      
       return [];
     }
 
@@ -283,29 +313,32 @@ const CORS_INVOCATIONS = [
       showMessage('正在從 Google Sheets 載入資料…', 'info');
 
       try {
+        // 1. 抓取主要資料 (只抓未拜訪或全部)
         const res1 = await fetchWithFallback(DATA_URL());
-        console.log('fetching via proxy', res1.url);
         const text1 = await res1.text();
-        const arr1 = parseUnknownResponse(text1).filter(s => s.lat && s.lng && s.name);
-        storeData = DRAW_ONLY_UNVISITED ? arr1.filter(s => !isVisited(s)) : arr1;
+        const dataResponse = JSON.parse(text1);
 
-        let totals = { total: 0, visited: 0, unvisited: 0 };
-        try {
-          const res2 = await fetchWithFallback(TOTALS_URL());
-          const text2 = await res2.text();
-          const all = parseUnknownResponse(text2);
-          totals.total = all.length;
-          totals.visited = all.reduce((n,s) => n + (isVisited(s)?1:0), 0);
-          totals.unvisited = totals.total - totals.visited;
-        } catch (e) {
-          console.warn('統計補抓失敗：', e);
-          totals.total = storeData.length;
-          totals.unvisited = storeData.length;
+        if (!dataResponse.success) {
+          throw new Error(dataResponse.message || '資料讀取失敗');
+        }
+        
+        // GAS #1 已經根據 DRAW_ONLY_UNVISITED 篩選好了，且已經正規化。
+        storeData = dataResponse.data.filter(s => s.lat && s.lng && s.name); 
+
+        // 2. 抓取總數統計 (必須抓全部資料)
+        let totals = dataResponse.meta || { total: storeData.length, visited: 0, unvisited: storeData.length };
+        
+        if (!dataResponse.meta) {
+          // 如果 GAS #1 沒有回傳 meta (例如舊版或錯誤)，則自行計算
+          const fullRes = await fetchWithFallback(TOTALS_URL());
+          const fullText = await fullRes.text();
+          const fullDataResponse = JSON.parse(fullText);
+          totals = fullDataResponse.meta || totals;
         }
 
         createMarkers();
         applyTotalsToUI(totals);
-        showMessage(`成功載入 ${storeData.length} 筆店家資料`, 'success');
+        showMessage(`成功載入 ${storeData.length} 筆待拜訪店家資料 (總計 ${totals.total} 筆)`, 'success');
         updateActiveMarkersUI();
 
       } catch (err) {
@@ -324,7 +357,7 @@ const CORS_INVOCATIONS = [
     }
 
     /**********************
-     *  繪製標記
+     * 繪製標記
      **********************/
     function clearMarkers() {
       markers.forEach(m => { try { m.setMap(null) } catch {} });
@@ -334,7 +367,9 @@ const CORS_INVOCATIONS = [
     function createMarkers() {
       clearMarkers();
       storeData.forEach((store, index) => {
-        if (isVisited(store)) return;
+        // 確保 storeData 內的 completed 狀態是準確的 (雖然 GAS 應已篩選)
+        if (isVisited(store)) return; 
+        
         const lat = parseFloat(store.lat), lng = parseFloat(store.lng);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
@@ -348,8 +383,15 @@ const CORS_INVOCATIONS = [
           }
         });
 
-        const info = new google.maps.InfoWindow({
-          content: `
+        // 將 store 資訊直接綁定到 marker 上
+        marker.storeData = store;
+        marker.storeIndex = index;
+
+        marker.addListener('click', () => {
+          // 點擊時關閉舊的 infoWindow 並開啟新的
+          if (infoWindow) infoWindow.close(); 
+          
+          const content = `
             <div class="info-window">
               <h3>${store.name || '未知店家'}</h3>
               <p><strong>類別:</strong> ${store.category || '未分類'}</p>
@@ -358,17 +400,12 @@ const CORS_INVOCATIONS = [
               <p><strong>備註:</strong> ${store.description || '無備註'}</p>
               <p><strong>紀錄時間:</strong> ${store.recordTime || '無紀錄'}</p>
               <button class="remove-btn" onclick="removeMarker(${index})">✅ 標記為已拜訪</button>
-            </div>`
+            </div>`;
+            
+          infoWindow.setContent(content);
+          infoWindow.open(map, marker);
         });
 
-        marker.addListener('click', () => {
-          markers.forEach(m => m.infoWindow?.close());
-          info.open(map, marker);
-        });
-
-        marker.infoWindow = info;
-        marker.storeIndex = index;
-        marker.rowIndex = store.rowIndex;
         markers.push(marker);
       });
 
@@ -385,13 +422,34 @@ const CORS_INVOCATIONS = [
     }
 
     /**********************
-     *  標記為已拜訪
+     * 標記為已拜訪 (安全 POST 寫入)
      **********************/
     async function markAsVisitedInSheet(rowIndex, storeName) {
-      const res = await fetchWithFallback(UPDATE_URL(rowIndex, storeName));
+      // 🚨 使用 POST 請求，將 Token 放入 Body 中 🚨
+      const payload = {
+        action: 'markVisited',
+        rowIndex: rowIndex,
+        storeName: storeName,
+        token: SHEET_WRITE_TOKEN // 安全地將 Token 放在 Body 裡
+      };
+
+      const res = await fetch(BASE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      // GAS #1 現在是標準 JSON 服務，不需要 CORS 代理
+      if (!res.ok) {
+        throw new Error(`HTTP 錯誤: ${res.status}`);
+      }
+
       const json = await res.json();
       if (!json || json.success !== true) {
-        throw new Error(json?.message || '更新 Google Sheets 失敗');
+        // 檢查 GAS 傳回的錯誤訊息
+        throw new Error(json?.message || json?.error || '更新 Google Sheets 失敗，請檢查 GAS 日誌');
       }
       return json;
     }
@@ -399,35 +457,46 @@ const CORS_INVOCATIONS = [
     async function removeMarker(storeIndex) {
       const marker = markers.find(m => m.storeIndex === storeIndex);
       const store = storeData[storeIndex];
+      
       if (!marker || !store) {
         showMessage('找不到要移除的標記', 'error');
         return;
       }
+      
+      // 確保 infoWindow 關閉
+      if (infoWindow) infoWindow.close();
 
       try {
-        showMessage('正在更新資料…', 'info');
+        showMessage(`正在安全地標記「${store.name}」為已完成…`, 'info');
+        
+        // 呼叫新的安全 POST 寫入函式
         await markAsVisitedInSheet(store.rowIndex, store.name);
 
-        marker.infoWindow?.close();
+        // 移除地圖標記
         marker.setMap(null);
         markers = markers.filter(m => m !== marker);
 
+        // 更新 storeData 狀態 (重要，防止重複操作)
         storeData[storeIndex].completed = true;
-        removedStores.add(storeIndex);
-
+        
+        // 更新 UI 統計數據
         const visitedEl = document.getElementById('visitedTotal');
         visitedEl.textContent = String(parseInt(visitedEl.textContent || '0', 10) + 1);
         updateActiveMarkersUI();
 
-        showMessage(`已將「${store.name}」標記為已拜訪`, 'success');
+        showMessage(`✅ 已將「${store.name}」標記為已拜訪並更新 Sheets`, 'success');
       } catch (e) {
         console.error(e);
         showMessage(`標記失敗：${e.message || e}`, 'error');
       }
     }
+    
+    // 將 removeMarker 函式暴露給 InfoWindow 內的 onclick
+    window.removeMarker = removeMarker;
+
 
     /**********************
-     *  搜尋位置
+     * 搜尋位置 (保持不變)
      **********************/
     const TAIWAN_LOCATIONS = {
       '台北': {lat:25.0330, lng:121.5654}, '台北市': {lat:25.0330, lng:121.5654},
@@ -504,7 +573,7 @@ const CORS_INVOCATIONS = [
     }
 
     /**********************
-     *  UI 輔助
+     * UI 輔助 (保持不變)
      **********************/
     function showMessage(msg, type='info') {
       const div = document.getElementById('messages');

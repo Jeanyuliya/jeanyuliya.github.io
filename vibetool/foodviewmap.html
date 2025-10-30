@@ -95,13 +95,14 @@ async function fetchWithFallback(url) {
     /**********************
      *  從 GAS 取 Maps Key（經代理）
      **********************/
-    async function getMapApiKey() {
-      const url = `${BASE_API_URL}?action=getMapKey&appVersion=${APP_VERSION}`;
-      const res = await fetchWithFallback(url);
-      const json = await res.json();
-      if(!json.success||!json.apiKey) throw new Error(json.message||'無法取得 Maps Key');
-      return json.apiKey;
-    }
+async function getMapApiKey() {
+  const url = 'https://jeanyuliya.zeabur.app/webhook/get-map-key?token=frontend-v3.1';
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || 'Failed to fetch key');
+  return json.apiKey;
+}
+
 
     /**********************
      *  載入 Google Maps

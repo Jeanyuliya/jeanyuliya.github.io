@@ -158,11 +158,7 @@ async function getMapApiKey() {
   /**********************
    *  地圖與標記
    **********************/
-  let map;
-  let markers = [];
-  let storeData = [];
-
-  async function initMap() {
+   async function initMap() {
     const center = { lat: 25.0330, lng: 121.5654 };
     map = new google.maps.Map(document.getElementById('map'), {
       zoom: 12,

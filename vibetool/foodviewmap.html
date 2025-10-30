@@ -139,6 +139,7 @@ function initMap() {
     center
   });
   showMessage('地圖初始化完成', 'success');
+  loadStoreData();
 }
 
 /**********************
@@ -300,16 +301,7 @@ function showMessage(msg, type='info') {
   setTimeout(() => el.remove(), 4000);
 }
 
-window.addEventListener('load', async () => {
-  await loadGoogleMapsAPI();
-  // 等地圖初始化完成後自動載入資料
-  const checkMapReady = setInterval(() => {
-    if (typeof map !== 'undefined' && map instanceof google.maps.Map) {
-      clearInterval(checkMapReady);
-      loadStoreData();   // ✅ 自動載入資料
-    }
-  }, 500);
-});
+window.addEventListener('load',()=>{loadGoogleMapsAPI();});
 </script>
 </body>
 </html>

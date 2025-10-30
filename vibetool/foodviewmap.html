@@ -284,6 +284,7 @@ const CORS_INVOCATIONS = [
 
       try {
         const res1 = await fetchWithFallback(DATA_URL());
+        console.log('fetching via proxy', res1.url);
         const text1 = await res1.text();
         const arr1 = parseUnknownResponse(text1).filter(s => s.lat && s.lng && s.name);
         storeData = DRAW_ONLY_UNVISITED ? arr1.filter(s => !isVisited(s)) : arr1;

@@ -161,6 +161,7 @@
                 <select id="colorScheme">
                     <option value="warm">暖色系（米色橙）</option>
                     <option value="cool">冷色系（藍綠）</option>
+                    <option value="recipe-notes">料理筆記</option>
                 </select>
             </div>
             
@@ -273,7 +274,12 @@
         imagePositionSelect.addEventListener('change', drawCanvas);
         
         // 配色方案選擇處理
-        colorSchemeSelect.addEventListener('change', drawCanvas);
+        colorSchemeSelect.addEventListener('change', function() {
+            if (colorSchemeSelect.value === 'recipe-notes') {
+                textInput.value = '**小筆記**';
+            }
+            drawCanvas();
+        });
         
         // 滑鼠拖拽文字位置
         canvas.addEventListener('mousedown', function(e) {
@@ -312,23 +318,26 @@
             // 清除畫布
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 繪製漸層背景（根據選擇的配色方案）
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            // 繪製背景（根據選擇的配色方案）
             const colorScheme = colorSchemeSelect.value;
-            
-            if (colorScheme === 'warm') {
-                // 暖色系：米色到橙色
-                gradient.addColorStop(0, '#F7F2ED');
-                gradient.addColorStop(0.5, '#FAEEE0');
-                gradient.addColorStop(1, '#FFDDB6');
+
+            if (colorScheme === 'recipe-notes') {
+                ctx.fillStyle = '#91B493';
             } else {
-                // 冷色系：藍綠色
-                gradient.addColorStop(0, '#d8f0f2');
-                gradient.addColorStop(0.5, '#d8f1e6');
-                gradient.addColorStop(1, '#d8f2da');
+                const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                if (colorScheme === 'warm') {
+                    // 暖色系：米色到橙色
+                    gradient.addColorStop(0, '#F7F2ED');
+                    gradient.addColorStop(0.5, '#FAEEE0');
+                    gradient.addColorStop(1, '#FFDDB6');
+                } else {
+                    // 冷色系：藍綠色
+                    gradient.addColorStop(0, '#d8f0f2');
+                    gradient.addColorStop(0.5, '#d8f1e6');
+                    gradient.addColorStop(1, '#d8f2da');
+                }
+                ctx.fillStyle = gradient;
             }
-            
-            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // 繪製文字（支援自動分行）

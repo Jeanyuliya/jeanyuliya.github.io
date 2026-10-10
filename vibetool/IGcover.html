@@ -320,24 +320,23 @@
             
             // 繪製背景（根據選擇的配色方案）
             const colorScheme = colorSchemeSelect.value;
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
 
             if (colorScheme === 'recipe-notes') {
-                ctx.fillStyle = '#91B493';
+                gradient.addColorStop(0, '#FFFFFF');
+                gradient.addColorStop(1, '#91B493');
+            } else if (colorScheme === 'warm') {
+                // 暖色系：米色到橙色
+                gradient.addColorStop(0, '#F7F2ED');
+                gradient.addColorStop(0.5, '#FAEEE0');
+                gradient.addColorStop(1, '#FFDDB6');
             } else {
-                const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-                if (colorScheme === 'warm') {
-                    // 暖色系：米色到橙色
-                    gradient.addColorStop(0, '#F7F2ED');
-                    gradient.addColorStop(0.5, '#FAEEE0');
-                    gradient.addColorStop(1, '#FFDDB6');
-                } else {
-                    // 冷色系：藍綠色
-                    gradient.addColorStop(0, '#d8f0f2');
-                    gradient.addColorStop(0.5, '#d8f1e6');
-                    gradient.addColorStop(1, '#d8f2da');
-                }
-                ctx.fillStyle = gradient;
+                // 冷色系：藍綠色
+                gradient.addColorStop(0, '#d8f0f2');
+                gradient.addColorStop(0.5, '#d8f1e6');
+                gradient.addColorStop(1, '#d8f2da');
             }
+            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // 繪製文字（支援自動分行）

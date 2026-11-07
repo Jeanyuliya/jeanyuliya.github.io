@@ -269,11 +269,11 @@ function createMarkers() {
     const safeAddress = escapeHtml(s.address || '無');
     const safeDescription = escapeHtml(s.description || '無');
     const actionButtons = isRevisit
-      ? '<button class="remove-btn neutral-btn" onclick="updateVisitStatusForMarker(' + i + ', \\'visited_once\\')">↩️ 取消想回訪</button>' +
-        '<button class="remove-btn danger-btn" onclick="updateVisitStatusForMarker(' + i + ', \\'closed_confirmed\\')">⛔ 確認歇業</button>'
-      : '<button class="remove-btn" onclick="updateVisitStatusForMarker(' + i + ', \\'visited_once\\')">✅ 標記為已拜訪</button>' +
-        '<button class="remove-btn revisit-btn" onclick="updateVisitStatusForMarker(' + i + ', \\'revisit_wanted\\')">⭐ 去過但想回訪</button>' +
-        '<button class="remove-btn danger-btn" onclick="updateVisitStatusForMarker(' + i + ', \\'closed_confirmed\\')">⛔ 確認歇業</button>';
+      ? '<button class="remove-btn neutral-btn" onclick="updateVisitStatusForMarker(' + i + ', \'visited_once\')">↩️ 取消想回訪</button>' +
+        '<button class="remove-btn danger-btn" onclick="updateVisitStatusForMarker(' + i + ', \'closed_confirmed\')">⛔ 確認歇業</button>'
+      : '<button class="remove-btn" onclick="updateVisitStatusForMarker(' + i + ', \'visited_once\')">✅ 標記為已拜訪</button>' +
+        '<button class="remove-btn revisit-btn" onclick="updateVisitStatusForMarker(' + i + ', \'revisit_wanted\')">⭐ 去過但想回訪</button>' +
+        '<button class="remove-btn danger-btn" onclick="updateVisitStatusForMarker(' + i + ', \'closed_confirmed\')">⛔ 確認歇業</button>';
     const info = new google.maps.InfoWindow({
       content: '<div class="info-window">' +
         '<h3>' + safeName + '</h3>' +
